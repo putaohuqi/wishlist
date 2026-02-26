@@ -76,7 +76,10 @@ function initialize() {
   refs.confirmCancel.addEventListener("click", closeDeleteConfirm);
   refs.confirmDelete.addEventListener("click", confirmDeleteItem);
   window.addEventListener("storage", handleStorageSync);
+  window.addEventListener("pageshow", resetOverlayState);
   document.addEventListener("keydown", handleGlobalKeydown);
+
+  resetOverlayState();
 
   if (!localStorage.getItem(STORAGE_KEY)) {
     persistItems(state.items);
@@ -270,6 +273,8 @@ function openEditModal(id) {
 }
 
 function openModal() {
+  refs.confirmBackdrop.hidden = true;
+  state.pendingDeleteId = null;
   refs.modalBackdrop.hidden = false;
   syncBodyModalState();
 }
@@ -281,6 +286,8 @@ function closeModal() {
 }
 
 function openDeleteConfirm(id) {
+  refs.modalBackdrop.hidden = true;
+  state.editingId = null;
   state.pendingDeleteId = id;
   refs.confirmBackdrop.hidden = false;
   syncBodyModalState();
@@ -313,6 +320,14 @@ function handleConfirmBackdropClick(event) {
 function syncBodyModalState() {
   const anyOpen = !refs.modalBackdrop.hidden || !refs.confirmBackdrop.hidden;
   document.body.classList.toggle("modal-open", anyOpen);
+}
+
+function resetOverlayState() {
+  refs.modalBackdrop.hidden = true;
+  refs.confirmBackdrop.hidden = true;
+  state.editingId = null;
+  state.pendingDeleteId = null;
+  syncBodyModalState();
 }
 
 function closeCardMenu(actionButton) {
