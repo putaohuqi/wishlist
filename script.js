@@ -75,19 +75,45 @@ function initializeCloudSync() {
 
   cloud.noteLocalChange(STORAGE_KEY, getLatestUpdate(state.items));
 
-  cloud.onAuthChange(async (user) => {
-    if (!user) {
+  let syncTimerId = 0;
+
+  const runSync = async () => {
+    if (!cloud.getCurrentUser()) {
       return;
     }
 
     try {
       const syncedItems = await cloud.syncList(CLOUD_LIST_ID, STORAGE_KEY, state.items);
+      if (JSON.stringify(syncedItems) === JSON.stringify(state.items)) {
+        return;
+      }
+
       localStorage.setItem(STORAGE_KEY, JSON.stringify(syncedItems));
       state.items = loadItems();
       ensureItemOrder();
       render();
     } catch (error) {
       console.error("Cloud sync failed for wishlist:", error);
+    }
+  };
+
+  cloud.onAuthChange(async (user) => {
+    if (syncTimerId) {
+      window.clearInterval(syncTimerId);
+      syncTimerId = 0;
+    }
+
+    if (!user) {
+      return;
+    }
+
+    await runSync();
+    syncTimerId = window.setInterval(runSync, 12000);
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      runSync();
     }
   });
 }

@@ -369,12 +369,14 @@
       }
     } catch (error) {
       console.error("Cloud read failed:", error);
+      reportSyncError(error);
       return local;
     }
 
     let merged = [];
     if (!cloud.length && !local.length) {
-      merged = [];
+      const backup = readLocalBackup(localKey);
+      merged = backup.length ? backup : [];
     } else if (!cloud.length) {
       merged = local;
     } else if (!local.length) {
@@ -390,9 +392,15 @@
     const cloudReadyMerged = toCloudPayload(merged);
     const cloudComparable = toCloudPayload(cloud);
     if (!isSameItems(cloudReadyMerged, cloudComparable) || mergedUpdatedAt > cloudUpdatedAt) {
-      await writeList(listId, cloudReadyMerged, mergedUpdatedAt);
+      try {
+        await writeList(listId, cloudReadyMerged, mergedUpdatedAt);
+      } catch (error) {
+        reportSyncError(error);
+        throw error;
+      }
     }
 
+    clearSyncError();
     return merged;
   }
 
@@ -413,6 +421,7 @@
       .then(() => writeList(listId, cloudPayload, updatedAtMs))
       .catch((error) => {
         console.error("Cloud write failed:", error);
+        reportSyncError(error);
       });
 
     saveQueues.set(queueKey, next);
@@ -539,6 +548,24 @@
     localStorage.setItem(`${localKey}${BACKUP_SUFFIX}`, JSON.stringify(payload));
   }
 
+  function readLocalBackup(localKey) {
+    const raw = localStorage.getItem(`${localKey}${BACKUP_SUFFIX}`);
+    if (!raw) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") {
+        return [];
+      }
+
+      return sanitizeItems(parsed.items);
+    } catch {
+      return [];
+    }
+  }
+
   function readLocalMeta(localKey) {
     const raw = localStorage.getItem(`${localKey}${META_SUFFIX}`);
     if (!raw) {
@@ -606,5 +633,35 @@
       saveList,
       noteLocalChange
     };
+  }
+
+  function reportSyncError(error) {
+    const message = getSyncErrorMessage(error);
+    setFeedback(message, "error");
+
+    if (refs.status && currentUser) {
+      refs.status.textContent = `sync error: ${message}`;
+    }
+  }
+
+  function clearSyncError() {
+    if (!currentUser) {
+      return;
+    }
+
+    setFeedback("sync connected", "success");
+    setSignedInUi(currentUser.email || "signed in");
+  }
+
+  function getSyncErrorMessage(error) {
+    const code = error && error.code ? String(error.code) : "";
+    const messages = {
+      "permission-denied": "firestore rules blocked access",
+      "unauthenticated": "you are not signed in",
+      "failed-precondition": "firestore database is not ready",
+      unavailable: "network issue while syncing"
+    };
+
+    return messages[code] || "cloud sync failed";
   }
 })();
