@@ -309,6 +309,8 @@ button {
   color: var(--text);
   font-weight: 500;
   font-size: 0.92rem;
+  line-height: 1;
+  white-space: nowrap;
   padding: 0 13px;
   cursor: pointer;
   box-shadow: var(--button-shadow);
@@ -1086,6 +1088,12 @@ button {
     justify-content: space-between;
   }
 
+  .add-btn {
+    height: 32px;
+    font-size: 0.84rem;
+    padding: 0 10px;
+  }
+
   .auth-inline {
     justify-content: flex-start;
   }
@@ -1185,6 +1193,12 @@ button {
 }
 
 @media (max-width: 560px) {
+  .add-btn {
+    height: 30px;
+    font-size: 0.8rem;
+    padding: 0 9px;
+  }
+
   .wishlist.view-list .wish-card {
     grid-template-columns: 64px minmax(0, 1fr) auto;
     grid-template-areas:
