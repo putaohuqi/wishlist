@@ -1,4 +1,5 @@
 const STORAGE_KEY = "manhwa-items-v1";
+const CLOUD_LIST_ID = "manhwa";
 const COLOR_SAMPLE_SIZE = 24;
 const MAX_UPLOAD_BYTES = 1200 * 1024;
 const STATUSES = ["reading", "paused", "completed"];
@@ -96,11 +97,36 @@ function initialize() {
     persistItems(state.items);
   }
 
+  initializeCloudSync();
   setActiveFilterButton();
   setActiveTypeFilterButton();
   setActiveGenreFilterButton();
   resetCoverInputs();
   render();
+}
+
+function initializeCloudSync() {
+  const cloud = window.WishlistCloud;
+  if (!cloud) {
+    return;
+  }
+
+  cloud.noteLocalChange(STORAGE_KEY, getLatestUpdate(state.items));
+
+  cloud.onAuthChange(async (user) => {
+    if (!user) {
+      return;
+    }
+
+    try {
+      const syncedItems = await cloud.syncList(CLOUD_LIST_ID, STORAGE_KEY, state.items);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(syncedItems));
+      state.items = loadItems();
+      render();
+    } catch (error) {
+      console.error("Cloud sync failed for manhwa tracker:", error);
+    }
+  });
 }
 
 function handleSubmit(event) {
@@ -143,7 +169,8 @@ function handleSubmit(event) {
     chapter,
     status,
     rating,
-    note
+    note,
+    _updatedAt: Date.now()
   };
 
   if (state.editingId) {
@@ -157,9 +184,11 @@ function handleSubmit(event) {
       };
     });
   } else {
+    const now = Date.now();
     state.items.unshift({
       id: createId(),
-      createdAt: Date.now(),
+      createdAt: now,
+      _updatedAt: now,
       ...payload
     });
   }
@@ -195,13 +224,15 @@ function handleListClick(event) {
   }
 
   if (action === "cycle-status") {
+    const now = Date.now();
     state.items = state.items.map((item) => {
       if (item.id !== id) {
         return item;
       }
       return {
         ...item,
-        status: nextStatus(item.status)
+        status: nextStatus(item.status),
+        _updatedAt: now
       };
     });
     persistItems(state.items);
@@ -422,7 +453,11 @@ function confirmDeleteItem() {
 }
 
 function syncBodyModalState() {
-  const anyOpen = !refs.modalBackdrop.hidden || !refs.confirmBackdrop.hidden;
+  const authBackdrop = document.getElementById("auth-backdrop");
+  const anyOpen =
+    !refs.modalBackdrop.hidden ||
+    !refs.confirmBackdrop.hidden ||
+    Boolean(authBackdrop && !authBackdrop.hidden);
   document.body.classList.toggle("modal-open", anyOpen);
 }
 
@@ -655,7 +690,8 @@ function loadItems() {
       .filter((item) => item && typeof item === "object")
       .map((item) => ({
         id: String(item.id || createId()),
-        createdAt: Number(item.createdAt || Date.now()),
+        createdAt: normalizeTimestamp(item.createdAt, Date.now()),
+        _updatedAt: normalizeTimestamp(item._updatedAt || item.updatedAt || item.createdAt, Date.now()),
         title: String(item.title || "Untitled"),
         url: String(item.url || "#"),
         cover: String(item.cover || ""),
@@ -673,6 +709,23 @@ function loadItems() {
 
 function persistItems(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+
+  const cloud = window.WishlistCloud;
+  if (!cloud) {
+    return;
+  }
+
+  const updatedAt = getLatestUpdate(items);
+  cloud.noteLocalChange(STORAGE_KEY, updatedAt);
+  cloud.saveList(CLOUD_LIST_ID, STORAGE_KEY, items);
+}
+
+function normalizeTimestamp(value, fallback) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return fallback;
 }
 
 function normalizeRequiredUrl(value) {
@@ -762,6 +815,17 @@ function normalizeRating(value) {
     return "";
   }
   return String(rounded);
+}
+
+function getLatestUpdate(items) {
+  if (!items.length) {
+    return Date.now();
+  }
+
+  return items.reduce((latest, item) => {
+    const nextValue = normalizeTimestamp(item._updatedAt || item.createdAt, 0);
+    return nextValue > latest ? nextValue : latest;
+  }, 0);
 }
 
 function nextStatus(currentStatus) {

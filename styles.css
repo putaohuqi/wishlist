@@ -111,6 +111,31 @@ body.modal-open {
   gap: 14px;
 }
 
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.auth-inline .chip {
+  flex: 0 0 auto;
+}
+
+.auth-status {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .page-nav {
   display: inline-flex;
   gap: 8px;
@@ -299,6 +324,12 @@ button {
   border-color: var(--blue-2);
   box-shadow: var(--button-hover-shadow);
   transform: scale(1.02);
+}
+
+.auth-btn {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 0.8rem;
 }
 
 .cards-section {
@@ -813,6 +844,10 @@ button {
   padding: 18px;
 }
 
+.auth-card {
+  width: min(420px, 100%);
+}
+
 .confirm-card {
   width: min(360px, 100%);
   padding: 16px;
@@ -831,6 +866,12 @@ button {
 
 .confirm-actions {
   margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.auth-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -966,6 +1007,26 @@ button {
   opacity: 0.9;
 }
 
+.auth-feedback {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+}
+
+.auth-feedback.is-muted {
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.auth-feedback.is-success {
+  color: var(--text);
+  opacity: 0.9;
+}
+
+.auth-feedback.is-error {
+  color: var(--text);
+  opacity: 0.9;
+}
+
 .search-wrap input:focus,
 .wish-form input:focus,
 .wish-form select:focus,
@@ -1009,6 +1070,23 @@ button {
 }
 
 @media (max-width: 780px) {
+  .top-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .top-actions {
+    justify-content: space-between;
+  }
+
+  .auth-inline {
+    justify-content: flex-start;
+  }
+
+  .auth-status {
+    width: 100%;
+  }
+
   .tool-row {
     flex-direction: column;
     align-items: stretch;
@@ -1032,6 +1110,10 @@ button {
 
   .chip {
     flex: 1;
+  }
+
+  .auth-inline .chip {
+    flex: 0 0 auto;
   }
 
   .taxonomy-group {

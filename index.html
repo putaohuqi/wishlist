@@ -15,6 +15,11 @@
     <link rel="shortcut icon" href="favicon.svg" />
     <link rel="apple-touch-icon" href="favicon.svg" />
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" defer></script>
+    <script src="firebase-config.js" defer></script>
+    <script src="auth-sync.js" defer></script>
     <script src="script.js" defer></script>
   </head>
   <body>
@@ -31,7 +36,14 @@
             <p id="header-stats" class="header-stats">0 items • 0 not bought</p>
             <p class="reorder-hint">drag cards to reorder</p>
           </div>
-          <button id="open-add" class="add-btn" type="button">+ Add</button>
+          <div class="top-actions">
+            <div class="auth-inline">
+              <p id="auth-status" class="auth-status">local only</p>
+              <button id="open-auth" class="chip auth-btn" type="button">sign in</button>
+              <button id="auth-signout" class="chip auth-btn" type="button" hidden>sign out</button>
+            </div>
+            <button id="open-add" class="add-btn" type="button">+ Add</button>
+          </div>
         </div>
 
         <div class="tool-row">
@@ -81,6 +93,37 @@
         </template>
       </section>
     </main>
+
+    <div id="auth-backdrop" class="modal-backdrop" hidden>
+      <section class="modal-card auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+        <div class="modal-head">
+          <h2 id="auth-title">sign in to sync</h2>
+          <button id="close-auth" class="close-btn" type="button">Close</button>
+        </div>
+
+        <form id="auth-form" class="wish-form">
+          <label for="auth-email">Email *</label>
+          <input id="auth-email" name="email" type="email" autocomplete="email" required />
+
+          <label for="auth-password">Password *</label>
+          <input
+            id="auth-password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            minlength="6"
+            required
+          />
+
+          <div class="auth-actions">
+            <button id="auth-submit" type="submit" class="add-btn">sign in</button>
+            <button id="auth-switch-mode" type="button" class="close-btn">create account</button>
+          </div>
+        </form>
+
+        <p id="auth-feedback" class="auth-feedback">local-only mode right now</p>
+      </section>
+    </div>
 
     <div id="modal-backdrop" class="modal-backdrop" hidden>
       <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">

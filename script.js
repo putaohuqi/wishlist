@@ -1,4 +1,5 @@
 const STORAGE_KEY = "wishlist-items-v1";
+const CLOUD_LIST_ID = "wishlist";
 const COLOR_SAMPLE_SIZE = 24;
 
 const accentCache = new Map();
@@ -59,10 +60,36 @@ function initialize() {
   }
 
   ensureItemOrder();
+  initializeCloudSync();
 
   setActiveFilterButton();
   applyViewClass();
   render();
+}
+
+function initializeCloudSync() {
+  const cloud = window.WishlistCloud;
+  if (!cloud) {
+    return;
+  }
+
+  cloud.noteLocalChange(STORAGE_KEY, getLatestUpdate(state.items));
+
+  cloud.onAuthChange(async (user) => {
+    if (!user) {
+      return;
+    }
+
+    try {
+      const syncedItems = await cloud.syncList(CLOUD_LIST_ID, STORAGE_KEY, state.items);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(syncedItems));
+      state.items = loadItems();
+      ensureItemOrder();
+      render();
+    } catch (error) {
+      console.error("Cloud sync failed for wishlist:", error);
+    }
+  });
 }
 
 function handleSubmit(event) {
@@ -101,7 +128,8 @@ function handleSubmit(event) {
     price: getCleanValue(formData.get("price")),
     size: getCleanValue(formData.get("size")),
     color: getCleanValue(formData.get("color")),
-    note: getCleanValue(formData.get("note"))
+    note: getCleanValue(formData.get("note")),
+    _updatedAt: Date.now()
   };
 
   if (state.editingId) {
@@ -116,10 +144,13 @@ function handleSubmit(event) {
     });
   } else {
     const frontOrder = getFrontOrder(state.items);
+    const now = Date.now();
     state.items.unshift({
       id: createId(),
       owned: false,
       order: frontOrder,
+      createdAt: now,
+      _updatedAt: now,
       ...payload
     });
   }
@@ -153,11 +184,12 @@ function handleListClick(event) {
     openDeleteConfirm(id);
     return;
   } else if (action === "toggle-owned") {
+    const now = Date.now();
     state.items = state.items.map((item) => {
       if (item.id !== id) {
         return item;
       }
-      return { ...item, owned: !item.owned };
+      return { ...item, owned: !item.owned, _updatedAt: now };
     });
   } else {
     return;
@@ -358,7 +390,11 @@ function handleConfirmBackdropClick(event) {
 }
 
 function syncBodyModalState() {
-  const anyOpen = !refs.modalBackdrop.hidden || !refs.confirmBackdrop.hidden;
+  const authBackdrop = document.getElementById("auth-backdrop");
+  const anyOpen =
+    !refs.modalBackdrop.hidden ||
+    !refs.confirmBackdrop.hidden ||
+    Boolean(authBackdrop && !authBackdrop.hidden);
   document.body.classList.toggle("modal-open", anyOpen);
 }
 
@@ -489,6 +525,8 @@ function loadItems() {
       .filter((item) => item && typeof item === "object")
       .map((item, index) => ({
         id: String(item.id || createId()),
+        createdAt: normalizeTimestamp(item.createdAt, Date.now()),
+        _updatedAt: normalizeTimestamp(item._updatedAt || item.updatedAt || item.createdAt, Date.now()),
         title: String(item.title || "Untitled item"),
         url: String(item.url || "#"),
         image: String(item.image || ""),
@@ -508,6 +546,15 @@ function loadItems() {
 
 function persistItems(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+
+  const cloud = window.WishlistCloud;
+  if (!cloud) {
+    return;
+  }
+
+  const updatedAt = getLatestUpdate(items);
+  cloud.noteLocalChange(STORAGE_KEY, updatedAt);
+  cloud.saveList(CLOUD_LIST_ID, STORAGE_KEY, items);
 }
 
 function normalizePriority(value) {
@@ -521,6 +568,14 @@ function normalizePriority(value) {
 function normalizeOrder(value, fallback) {
   const parsed = Number(value);
   if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+  return fallback;
+}
+
+function normalizeTimestamp(value, fallback) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed > 0) {
     return parsed;
   }
   return fallback;
@@ -558,6 +613,17 @@ function getFrontOrder(items) {
     }
   });
   return minOrder - 1;
+}
+
+function getLatestUpdate(items) {
+  if (!items.length) {
+    return Date.now();
+  }
+
+  return items.reduce((latest, item) => {
+    const nextValue = normalizeTimestamp(item._updatedAt || item.createdAt, 0);
+    return nextValue > latest ? nextValue : latest;
+  }, 0);
 }
 
 function reorderVisibleItems(sourceId, targetId, insertAfter) {

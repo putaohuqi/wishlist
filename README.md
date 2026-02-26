@@ -1,35 +1,48 @@
-# Wishlist Starter (GitHub Pages)
+# Wishlist + Manhwa Tracker (GitHub Pages)
 
-Simple static wishlist website with:
-- Add item name + product link
-- Optional product photo link
-- Category, priority, price, size, color, and note fields
-- Full `Edit item` button on each card (edit all fields)
-- Filters (`All`, `Not bought`, `Bought`)
-- Search
-- Local browser save (uses `localStorage`)
+Static site with two pages:
+- `index.html`: wishlist
+- `manhwa.html`: reading tracker
 
-## Files
-- `index.html`
-- `styles.css`
-- `script.js`
+Both pages save locally and can optionally sync with account login.
 
-## Run locally
-Open `index.html` in your browser.
+## Features
+- Wishlist add/edit/delete + drag reorder
+- Manhwa tracker with type/genre/status filters + cover upload
+- Local browser save (`localStorage`)
+- Optional email/password login + cloud sync (Firebase Auth + Firestore)
+
+## Local data safety
+Enabling login does **not** wipe your current lists.
+- Existing local items stay in `localStorage`.
+- On first login, local and cloud lists are merged safely.
+- Local backups are kept under `wishlist-items-v1-backup-v1` and `manhwa-items-v1-backup-v1`.
+
+## Firebase setup (for phone + computer sync)
+1. Create a Firebase project.
+2. Enable `Authentication` -> `Email/Password`.
+3. Create Firestore database.
+4. In Firebase project settings, create a web app and copy the config.
+5. Paste config values into `firebase-config.js`.
+6. Deploy/push to GitHub Pages.
+
+## Firestore rules (minimum)
+Use rules that allow users to access only their own data:
+
+```txt
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/lists/{listId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
 
 ## Publish to GitHub Pages
-1. Create a GitHub repo and put these files in the root.
-2. Commit and push to `main` (or your default branch).
-3. In GitHub, go to `Settings` -> `Pages`.
-4. Under `Build and deployment`, choose:
-   - `Source`: `Deploy from a branch`
-   - `Branch`: `main` and `/ (root)`
-5. Save, then wait about 1-2 minutes.
-6. Your site will be at:
-   - `https://<your-username>.github.io/<repo-name>/`
-
-## Customize quickly
-- Edit starter items in `script.js` (`STARTER_ITEMS`).
-- Edit colors/fonts in `styles.css` (`:root` variables).
-- Add your own product photos by pasting image links in the `Photo link` field.
-- Replace `favicon.svg` to personalize the browser tab/bookmark icon.
+1. Commit and push to `main`.
+2. Repo `Settings` -> `Pages`.
+3. Source: `Deploy from a branch`.
+4. Branch: `main`, folder: `/ (root)`.
+5. Open: `https://<username>.github.io/<repo>/`.
