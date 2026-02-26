@@ -95,8 +95,7 @@ body.modal-open {
 }
 
 .topbar {
-  position: sticky;
-  top: 0;
+  position: static;
   z-index: 20;
   background: var(--header-bg);
   border-bottom: 1px solid var(--header-border);
