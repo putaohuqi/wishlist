@@ -387,8 +387,10 @@
     const mergedUpdatedAt = Math.max(localUpdatedAt, cloudUpdatedAt, getLatestUpdate(merged)) || Date.now();
     writeLocalMeta(localKey, mergedUpdatedAt, currentUser.uid);
 
-    if (!isSameItems(merged, cloud) || mergedUpdatedAt > cloudUpdatedAt) {
-      await writeList(listId, merged, mergedUpdatedAt);
+    const cloudReadyMerged = toCloudPayload(merged);
+    const cloudComparable = toCloudPayload(cloud);
+    if (!isSameItems(cloudReadyMerged, cloudComparable) || mergedUpdatedAt > cloudUpdatedAt) {
+      await writeList(listId, cloudReadyMerged, mergedUpdatedAt);
     }
 
     return merged;
@@ -400,6 +402,7 @@
     }
 
     const payload = sanitizeItems(items);
+    const cloudPayload = toCloudPayload(payload);
     const updatedAtMs = Math.max(getLatestUpdate(payload), Date.now());
     writeLocalMeta(localKey, updatedAtMs, currentUser.uid);
 
@@ -407,7 +410,7 @@
     const previous = saveQueues.get(queueKey) || Promise.resolve();
     const next = previous
       .catch(() => {})
-      .then(() => writeList(listId, payload, updatedAtMs))
+      .then(() => writeList(listId, cloudPayload, updatedAtMs))
       .catch((error) => {
         console.error("Cloud write failed:", error);
       });
@@ -496,6 +499,24 @@
       });
   }
 
+  function toCloudPayload(items) {
+    return sanitizeItems(items).map((item) => {
+      const clone = { ...item };
+
+      // Local file uploads are stored as data URLs and can exceed Firestore doc limits.
+      // Keep them locally, but remove from cloud payload so sync still works.
+      if (isDataImageUrl(clone.cover)) {
+        clone.cover = "";
+      }
+
+      if (isDataImageUrl(clone.image)) {
+        clone.image = "";
+      }
+
+      return clone;
+    });
+  }
+
   function normalizeId(id, index) {
     const clean = getCleanValue(id);
     if (clean) {
@@ -570,6 +591,10 @@
 
   function getCleanValue(value) {
     return String(value || "").trim();
+  }
+
+  function isDataImageUrl(value) {
+    return getCleanValue(value).toLowerCase().startsWith("data:image/");
   }
 
   function exposeApi() {
