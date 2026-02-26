@@ -32,3 +32,4 @@ Open `index.html` in your browser.
 - Edit starter items in `script.js` (`STARTER_ITEMS`).
 - Edit colors/fonts in `styles.css` (`:root` variables).
 - Add your own product photos by pasting image links in the `Photo link` field.
+- Replace `favicon.svg` to personalize the browser tab/bookmark icon.
