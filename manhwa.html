@@ -56,6 +56,7 @@
             <button type="button" class="chip is-active" data-filter="all">All</button>
             <button type="button" class="chip" data-filter="reading">Reading</button>
             <button type="button" class="chip" data-filter="paused">Paused</button>
+            <button type="button" class="chip" data-filter="want-to-read">Want to read</button>
             <button type="button" class="chip" data-filter="completed">Completed</button>
           </div>
         </div>
@@ -100,6 +101,17 @@
           <ul id="ongoing-list" class="wishlist manhwa-list" aria-live="polite"></ul>
           <p id="ongoing-empty" class="empty-state" hidden>
             No ongoing reads in this filter.
+          </p>
+        </section>
+
+        <section id="want-section" class="read-section">
+          <div class="read-section-head">
+            <h2>want to read</h2>
+            <p id="want-count" class="section-count">0 series</p>
+          </div>
+          <ul id="want-list" class="wishlist manhwa-list" aria-live="polite"></ul>
+          <p id="want-empty" class="empty-state" hidden>
+            No recommendations in this filter.
           </p>
         </section>
 
@@ -240,6 +252,7 @@
               <select id="status" name="status">
                 <option value="reading" selected>Reading</option>
                 <option value="paused">Paused</option>
+                <option value="want-to-read">Want to read</option>
                 <option value="completed">Completed</option>
               </select>
             </div>

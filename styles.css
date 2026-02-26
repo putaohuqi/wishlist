@@ -800,6 +800,12 @@ button {
   color: var(--text);
 }
 
+.series-status.status-want-to-read {
+  border-color: var(--blue-3);
+  background: color-mix(in srgb, var(--card) 74%, var(--blue-5));
+  color: var(--text);
+}
+
 .empty-state {
   margin: 0;
   border: 1px dashed var(--border);

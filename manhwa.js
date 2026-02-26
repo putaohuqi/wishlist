@@ -2,7 +2,7 @@ const STORAGE_KEY = "manhwa-items-v1";
 const CLOUD_LIST_ID = "manhwa";
 const COLOR_SAMPLE_SIZE = 24;
 const MAX_UPLOAD_BYTES = 1200 * 1024;
-const STATUSES = ["reading", "paused", "completed"];
+const STATUSES = ["reading", "paused", "want-to-read", "completed"];
 const SERIES_TYPES = ["manhwa", "manga", "manhua"];
 const SERIES_GENRES = [
   "bl",
@@ -27,6 +27,7 @@ const LEGACY_GENRE_ALIASES = {
 const STATUS_LABELS = {
   reading: "Reading",
   paused: "Paused",
+  "want-to-read": "Want to read",
   completed: "Completed"
 };
 const TYPE_LABELS = {
@@ -66,12 +67,16 @@ const refs = {
   form: document.getElementById("manhwa-form"),
   listsWrap: document.getElementById("manhwa-lists"),
   ongoingSection: document.getElementById("ongoing-section"),
+  wantSection: document.getElementById("want-section"),
   completedSection: document.getElementById("completed-section"),
   ongoingList: document.getElementById("ongoing-list"),
+  wantList: document.getElementById("want-list"),
   completedList: document.getElementById("completed-list"),
   ongoingEmpty: document.getElementById("ongoing-empty"),
+  wantEmpty: document.getElementById("want-empty"),
   completedEmpty: document.getElementById("completed-empty"),
   ongoingCount: document.getElementById("ongoing-count"),
+  wantCount: document.getElementById("want-count"),
   completedCount: document.getElementById("completed-count"),
   template: document.getElementById("manhwa-template"),
   empty: document.getElementById("empty-state"),
@@ -675,31 +680,42 @@ function setActiveGenreFilterButton() {
 
 function render() {
   const visibleItems = getVisibleItems(state.items, state.filter, state.typeFilter, state.genreFilter, state.query);
-  const ongoingItems = visibleItems.filter((item) => normalizeStatus(item.status) !== "completed");
+  const ongoingItems = visibleItems.filter((item) => {
+    const status = normalizeStatus(item.status);
+    return status !== "completed" && status !== "want-to-read";
+  });
+  const wantItems = visibleItems.filter((item) => normalizeStatus(item.status) === "want-to-read");
   const completedItems = visibleItems.filter((item) => normalizeStatus(item.status) === "completed");
 
   refs.ongoingCount.textContent = `${ongoingItems.length} series`;
+  refs.wantCount.textContent = `${wantItems.length} series`;
   refs.completedCount.textContent = `${completedItems.length} series`;
 
   refs.empty.hidden = visibleItems.length !== 0;
   if (visibleItems.length === 0) {
     refs.ongoingSection.hidden = true;
+    refs.wantSection.hidden = true;
     refs.completedSection.hidden = true;
     refs.ongoingList.innerHTML = "";
+    refs.wantList.innerHTML = "";
     refs.completedList.innerHTML = "";
     refs.ongoingEmpty.hidden = true;
+    refs.wantEmpty.hidden = true;
     refs.completedEmpty.hidden = true;
     renderStats(state.items);
     return;
   }
 
-  const showOngoing = state.filter !== "completed";
-  const showCompleted = state.filter !== "reading" && state.filter !== "paused";
+  const showOngoing = state.filter === "all" || state.filter === "reading" || state.filter === "paused";
+  const showWant = state.filter === "all" || state.filter === "want-to-read";
+  const showCompleted = state.filter === "all" || state.filter === "completed";
 
   refs.ongoingSection.hidden = !showOngoing;
+  refs.wantSection.hidden = !showWant;
   refs.completedSection.hidden = !showCompleted;
 
   renderSection(refs.ongoingList, refs.ongoingEmpty, ongoingItems, showOngoing);
+  renderSection(refs.wantList, refs.wantEmpty, wantItems, showWant);
   renderSection(refs.completedList, refs.completedEmpty, completedItems, showCompleted);
 
   renderStats(state.items);
@@ -790,7 +806,8 @@ function buildMetaLine(item) {
 function renderStats(items) {
   const total = items.length;
   const reading = items.filter((item) => normalizeStatus(item.status) === "reading").length;
-  refs.stats.textContent = `${total} series • ${reading} reading`;
+  const want = items.filter((item) => normalizeStatus(item.status) === "want-to-read").length;
+  refs.stats.textContent = `${total} series • ${reading} reading • ${want} want to read`;
 }
 
 function getVisibleItems(items, filter, typeFilter, genreFilter, query) {
