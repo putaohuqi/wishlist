@@ -1,0 +1,651 @@
+const STORAGE_KEY = "manhwa-items-v1";
+const COLOR_SAMPLE_SIZE = 24;
+const STATUSES = ["reading", "paused", "completed"];
+const STATUS_LABELS = {
+  reading: "Reading",
+  paused: "Paused",
+  completed: "Completed"
+};
+
+const accentCache = new Map();
+
+const state = {
+  items: loadItems(),
+  filter: "all",
+  query: "",
+  editingId: null,
+  pendingDeleteId: null
+};
+
+const refs = {
+  form: document.getElementById("manhwa-form"),
+  list: document.getElementById("manhwa-list"),
+  template: document.getElementById("manhwa-template"),
+  empty: document.getElementById("empty-state"),
+  search: document.getElementById("search"),
+  filters: Array.from(document.querySelectorAll("[data-filter]")),
+  stats: document.getElementById("header-stats"),
+  openAdd: document.getElementById("open-add"),
+  closeAdd: document.getElementById("close-add"),
+  modalBackdrop: document.getElementById("modal-backdrop"),
+  modalTitle: document.getElementById("modal-title"),
+  saveSeriesButton: document.getElementById("save-series-btn"),
+  confirmBackdrop: document.getElementById("confirm-backdrop"),
+  confirmCancel: document.getElementById("confirm-cancel"),
+  confirmDelete: document.getElementById("confirm-delete")
+};
+
+initialize();
+
+function initialize() {
+  refs.form.addEventListener("submit", handleSubmit);
+  refs.list.addEventListener("click", handleListClick);
+  refs.search.addEventListener("input", handleSearch);
+  refs.filters.forEach((button) => button.addEventListener("click", handleFilterChange));
+  refs.openAdd.addEventListener("click", openAddModal);
+  refs.closeAdd.addEventListener("click", closeModal);
+  refs.modalBackdrop.addEventListener("click", handleModalBackdropClick);
+  refs.confirmBackdrop.addEventListener("click", handleConfirmBackdropClick);
+  refs.confirmCancel.addEventListener("click", closeDeleteConfirm);
+  refs.confirmDelete.addEventListener("click", confirmDeleteItem);
+  window.addEventListener("storage", handleStorageSync);
+  window.addEventListener("pageshow", resetOverlayState);
+  document.addEventListener("keydown", handleGlobalKeydown);
+
+  resetOverlayState();
+
+  if (!localStorage.getItem(STORAGE_KEY)) {
+    persistItems(state.items);
+  }
+
+  setActiveFilterButton();
+  render();
+}
+
+function handleSubmit(event) {
+  event.preventDefault();
+
+  const formData = new FormData(refs.form);
+  const title = getCleanValue(formData.get("title"));
+  const urlValue = getCleanValue(formData.get("url"));
+  const coverValue = getCleanValue(formData.get("cover"));
+  const chapter = getCleanValue(formData.get("chapter"));
+  const status = normalizeStatus(formData.get("status"));
+  const rating = normalizeRating(formData.get("rating"));
+  const note = getCleanValue(formData.get("note"));
+
+  if (!title || !urlValue) {
+    return;
+  }
+
+  const parsedUrl = normalizeRequiredUrl(urlValue);
+  if (!parsedUrl) {
+    refs.form.querySelector("#url").focus();
+    return;
+  }
+
+  const parsedCover = normalizeOptionalUrl(coverValue);
+  if (parsedCover === null) {
+    refs.form.querySelector("#cover").focus();
+    return;
+  }
+
+  const payload = {
+    title,
+    url: parsedUrl,
+    cover: parsedCover,
+    chapter,
+    status,
+    rating,
+    note
+  };
+
+  if (state.editingId) {
+    state.items = state.items.map((item) => {
+      if (item.id !== state.editingId) {
+        return item;
+      }
+      return {
+        ...item,
+        ...payload
+      };
+    });
+  } else {
+    state.items.unshift({
+      id: createId(),
+      createdAt: Date.now(),
+      ...payload
+    });
+  }
+
+  persistItems(state.items);
+  render();
+  closeModal();
+}
+
+function handleListClick(event) {
+  const actionButton = event.target.closest("button[data-action]");
+  if (!actionButton) {
+    return;
+  }
+
+  const card = actionButton.closest(".wish-card");
+  if (!card) {
+    return;
+  }
+
+  const id = card.dataset.id;
+  const action = actionButton.dataset.action;
+  closeCardMenu(actionButton);
+
+  if (action === "edit-item") {
+    openEditModal(id);
+    return;
+  }
+
+  if (action === "delete") {
+    openDeleteConfirm(id);
+    return;
+  }
+
+  if (action === "cycle-status") {
+    state.items = state.items.map((item) => {
+      if (item.id !== id) {
+        return item;
+      }
+      return {
+        ...item,
+        status: nextStatus(item.status)
+      };
+    });
+    persistItems(state.items);
+    render();
+  }
+}
+
+function handleSearch(event) {
+  state.query = getCleanValue(event.target.value).toLowerCase();
+  render();
+}
+
+function handleFilterChange(event) {
+  const nextFilter = event.currentTarget.dataset.filter;
+  if (!nextFilter) {
+    return;
+  }
+
+  state.filter = nextFilter;
+  setActiveFilterButton();
+  render();
+}
+
+function handleStorageSync(event) {
+  if (event.key !== STORAGE_KEY) {
+    return;
+  }
+  state.items = loadItems();
+  render();
+}
+
+function handleModalBackdropClick(event) {
+  if (event.target === refs.modalBackdrop) {
+    closeModal();
+  }
+}
+
+function handleConfirmBackdropClick(event) {
+  if (event.target === refs.confirmBackdrop) {
+    closeDeleteConfirm();
+  }
+}
+
+function handleGlobalKeydown(event) {
+  if (event.key !== "Escape") {
+    return;
+  }
+
+  if (!refs.confirmBackdrop.hidden) {
+    closeDeleteConfirm();
+    return;
+  }
+
+  if (!refs.modalBackdrop.hidden) {
+    closeModal();
+  }
+}
+
+function openAddModal() {
+  state.editingId = null;
+  refs.form.reset();
+  refs.form.querySelector("#status").value = "reading";
+  refs.form.querySelector("#rating").value = "";
+  refs.modalTitle.textContent = "Add a manhwa";
+  refs.saveSeriesButton.textContent = "Save to tracker";
+  openModal();
+  refs.form.querySelector("#title").focus();
+}
+
+function openEditModal(id) {
+  const item = state.items.find((entry) => entry.id === id);
+  if (!item) {
+    return;
+  }
+
+  state.editingId = id;
+  refs.form.querySelector("#title").value = item.title;
+  refs.form.querySelector("#url").value = item.url;
+  refs.form.querySelector("#cover").value = item.cover || "";
+  refs.form.querySelector("#chapter").value = item.chapter || "";
+  refs.form.querySelector("#status").value = normalizeStatus(item.status);
+  refs.form.querySelector("#rating").value = normalizeRating(item.rating);
+  refs.form.querySelector("#note").value = item.note || "";
+
+  refs.modalTitle.textContent = "Edit series";
+  refs.saveSeriesButton.textContent = "Save changes";
+  openModal();
+  refs.form.querySelector("#title").focus();
+}
+
+function openModal() {
+  refs.confirmBackdrop.hidden = true;
+  state.pendingDeleteId = null;
+  refs.modalBackdrop.hidden = false;
+  syncBodyModalState();
+}
+
+function closeModal() {
+  refs.modalBackdrop.hidden = true;
+  state.editingId = null;
+  syncBodyModalState();
+}
+
+function openDeleteConfirm(id) {
+  refs.modalBackdrop.hidden = true;
+  state.editingId = null;
+  state.pendingDeleteId = id;
+  refs.confirmBackdrop.hidden = false;
+  syncBodyModalState();
+}
+
+function closeDeleteConfirm() {
+  refs.confirmBackdrop.hidden = true;
+  state.pendingDeleteId = null;
+  syncBodyModalState();
+}
+
+function confirmDeleteItem() {
+  if (!state.pendingDeleteId) {
+    closeDeleteConfirm();
+    return;
+  }
+
+  state.items = state.items.filter((item) => item.id !== state.pendingDeleteId);
+  persistItems(state.items);
+  render();
+  closeDeleteConfirm();
+}
+
+function syncBodyModalState() {
+  const anyOpen = !refs.modalBackdrop.hidden || !refs.confirmBackdrop.hidden;
+  document.body.classList.toggle("modal-open", anyOpen);
+}
+
+function resetOverlayState() {
+  refs.modalBackdrop.hidden = true;
+  refs.confirmBackdrop.hidden = true;
+  state.editingId = null;
+  state.pendingDeleteId = null;
+  syncBodyModalState();
+}
+
+function closeCardMenu(actionButton) {
+  const menu = actionButton.closest(".card-menu");
+  if (menu) {
+    menu.open = false;
+  }
+}
+
+function setActiveFilterButton() {
+  refs.filters.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.filter === state.filter);
+  });
+}
+
+function render() {
+  const visibleItems = getVisibleItems(state.items, state.filter, state.query);
+  refs.list.innerHTML = "";
+
+  visibleItems.forEach((item) => {
+    const card = refs.template.content.firstElementChild.cloneNode(true);
+    card.dataset.id = item.id;
+    clearCardAccent(card);
+
+    const statusPill = card.querySelector(".series-status");
+    statusPill.textContent = STATUS_LABELS[normalizeStatus(item.status)];
+    statusPill.classList.add(`status-${normalizeStatus(item.status)}`);
+
+    const photoLink = card.querySelector(".wish-photo-link");
+    const photo = card.querySelector(".wish-photo");
+    if (item.cover) {
+      photo.crossOrigin = "anonymous";
+      photo.src = item.cover;
+      photo.alt = `${item.title} cover`;
+      photoLink.href = item.url;
+      photoLink.classList.remove("is-placeholder");
+      applyCardAccentFromImage(card, photo, item.cover);
+    } else {
+      photo.src = createCoverPlaceholder(item.title);
+      photo.alt = `${item.title} cover placeholder`;
+      photoLink.href = item.url;
+      photoLink.classList.add("is-placeholder");
+    }
+
+    const titleLink = card.querySelector(".wish-title-link");
+    titleLink.textContent = item.title;
+    titleLink.href = item.url;
+
+    card.querySelector(".wish-meta-text").textContent = buildMetaLine(item);
+
+    const note = card.querySelector(".series-note");
+    if (item.note) {
+      note.hidden = false;
+      note.textContent = item.note;
+    } else {
+      note.hidden = true;
+      note.textContent = "";
+    }
+
+    const cycleButton = card.querySelector("[data-action='cycle-status']");
+    cycleButton.textContent = `Set ${STATUS_LABELS[nextStatus(item.status)].toLowerCase()}`;
+
+    refs.list.append(card);
+  });
+
+  refs.empty.hidden = visibleItems.length !== 0;
+  renderStats(state.items);
+}
+
+function buildMetaLine(item) {
+  const parts = [];
+  if (item.chapter) {
+    parts.push(`Ch. ${item.chapter}`);
+  }
+  parts.push(STATUS_LABELS[normalizeStatus(item.status)]);
+  if (item.rating) {
+    parts.push(`${item.rating}/10`);
+  }
+  return parts.join(" · ");
+}
+
+function renderStats(items) {
+  const total = items.length;
+  const reading = items.filter((item) => normalizeStatus(item.status) === "reading").length;
+  refs.stats.textContent = `${total} series • ${reading} reading`;
+}
+
+function getVisibleItems(items, filter, query) {
+  return [...items]
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+    .filter((item) => {
+      if (filter === "all") {
+        return true;
+      }
+      return normalizeStatus(item.status) === filter;
+    })
+    .filter((item) => {
+      if (!query) {
+        return true;
+      }
+      const haystack = `${item.title} ${item.chapter} ${item.status} ${item.rating} ${item.note}`.toLowerCase();
+      return haystack.includes(query);
+    });
+}
+
+function loadItems() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((item) => item && typeof item === "object")
+      .map((item) => ({
+        id: String(item.id || createId()),
+        createdAt: Number(item.createdAt || Date.now()),
+        title: String(item.title || "Untitled"),
+        url: String(item.url || "#"),
+        cover: String(item.cover || ""),
+        chapter: String(item.chapter || ""),
+        status: normalizeStatus(item.status),
+        rating: normalizeRating(item.rating),
+        note: String(item.note || "")
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function persistItems(items) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+function normalizeRequiredUrl(value) {
+  const clean = getCleanValue(value);
+  if (!clean) {
+    return "";
+  }
+
+  try {
+    return new URL(clean).toString();
+  } catch {
+    return "";
+  }
+}
+
+function normalizeOptionalUrl(value) {
+  const clean = getCleanValue(value);
+  if (!clean) {
+    return "";
+  }
+
+  try {
+    return new URL(clean).toString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizeUrl(value) {
+  try {
+    return new URL(String(value || "").trim()).toString();
+  } catch {
+    return String(value || "").trim();
+  }
+}
+
+function normalizeStatus(value) {
+  const clean = getCleanValue(value).toLowerCase();
+  if (STATUSES.includes(clean)) {
+    return clean;
+  }
+  return "reading";
+}
+
+function normalizeRating(value) {
+  const clean = getCleanValue(value);
+  if (!clean) {
+    return "";
+  }
+
+  const numeric = Number(clean);
+  if (!Number.isFinite(numeric)) {
+    return "";
+  }
+
+  const rounded = Math.round(numeric);
+  if (rounded < 1 || rounded > 10) {
+    return "";
+  }
+  return String(rounded);
+}
+
+function nextStatus(currentStatus) {
+  const currentIndex = STATUSES.indexOf(normalizeStatus(currentStatus));
+  return STATUSES[(currentIndex + 1) % STATUSES.length];
+}
+
+function getCleanValue(value) {
+  return String(value || "").trim();
+}
+
+function createId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `series-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createCoverPlaceholder(title) {
+  const firstLetter = getCleanValue(title).charAt(0).toUpperCase() || "?";
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+      <defs>
+        <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#e5f3fd" />
+          <stop offset="100%" stop-color="#d1e5f4" />
+        </linearGradient>
+      </defs>
+      <rect width="200" height="200" fill="url(#g)" />
+      <text x="100" y="118" text-anchor="middle" fill="#7b7b85" font-family="Nunito, sans-serif" font-size="84" font-weight="700">${firstLetter}</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function applyCardAccentFromImage(card, photo, imageUrl) {
+  const cacheKey = normalizeUrl(imageUrl);
+  const cachedAccent = accentCache.get(cacheKey);
+  if (cachedAccent) {
+    setCardAccent(card, cachedAccent);
+    return;
+  }
+
+  const assignAccent = () => {
+    const accent = extractDominantAccent(photo);
+    if (!accent) {
+      return;
+    }
+
+    accentCache.set(cacheKey, accent);
+    if (card.isConnected) {
+      setCardAccent(card, accent);
+    }
+  };
+
+  if (photo.complete && photo.naturalWidth > 0) {
+    assignAccent();
+    return;
+  }
+
+  photo.addEventListener("load", assignAccent, { once: true });
+}
+
+function setCardAccent(card, accentRgb) {
+  card.style.setProperty("--card-accent-rgb", accentRgb);
+  card.classList.add("has-accent");
+}
+
+function clearCardAccent(card) {
+  card.style.removeProperty("--card-accent-rgb");
+  card.classList.remove("has-accent");
+}
+
+function extractDominantAccent(photo) {
+  if (!photo.naturalWidth || !photo.naturalHeight) {
+    return "";
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = COLOR_SAMPLE_SIZE;
+  canvas.height = COLOR_SAMPLE_SIZE;
+
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) {
+    return "";
+  }
+
+  try {
+    context.drawImage(photo, 0, 0, COLOR_SAMPLE_SIZE, COLOR_SAMPLE_SIZE);
+  } catch {
+    return "";
+  }
+
+  let pixelData;
+  try {
+    pixelData = context.getImageData(0, 0, COLOR_SAMPLE_SIZE, COLOR_SAMPLE_SIZE).data;
+  } catch {
+    return "";
+  }
+
+  let redTotal = 0;
+  let greenTotal = 0;
+  let blueTotal = 0;
+  let weightTotal = 0;
+
+  for (let index = 0; index < pixelData.length; index += 4) {
+    const red = pixelData[index];
+    const green = pixelData[index + 1];
+    const blue = pixelData[index + 2];
+    const alpha = pixelData[index + 3] / 255;
+
+    if (alpha < 0.45) {
+      continue;
+    }
+
+    const max = Math.max(red, green, blue);
+    const min = Math.min(red, green, blue);
+    const saturation = max === 0 ? 0 : (max - min) / max;
+    const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
+
+    if (luminance > 0.95 || luminance < 0.08) {
+      continue;
+    }
+
+    const weight = (0.25 + saturation * 0.75) * alpha;
+    redTotal += red * weight;
+    greenTotal += green * weight;
+    blueTotal += blue * weight;
+    weightTotal += weight;
+  }
+
+  if (weightTotal < 1) {
+    return "";
+  }
+
+  const softened = softenAccentColor({
+    red: Math.round(redTotal / weightTotal),
+    green: Math.round(greenTotal / weightTotal),
+    blue: Math.round(blueTotal / weightTotal)
+  });
+
+  return `${softened.red} ${softened.green} ${softened.blue}`;
+}
+
+function softenAccentColor(color) {
+  const blend = 0.2;
+  return {
+    red: blendChannel(color.red, 255, blend),
+    green: blendChannel(color.green, 255, blend),
+    blue: blendChannel(color.blue, 255, blend)
+  };
+}
+
+function blendChannel(source, target, amount) {
+  return Math.round(source * (1 - amount) + target * amount);
+}

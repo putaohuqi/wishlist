@@ -111,6 +111,12 @@ body.modal-open {
   gap: 14px;
 }
 
+.page-nav {
+  display: inline-flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .subtitle {
   margin: 0;
   font-size: 0.82rem;
@@ -218,6 +224,16 @@ button {
   height: 6px;
   border-radius: 999px;
   background: var(--blue-2);
+}
+
+.page-link {
+  text-decoration: none;
+  line-height: 34px;
+}
+
+.page-link:focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 2px;
 }
 
 .add-btn {
@@ -567,6 +583,117 @@ button {
   height: 28px;
 }
 
+.manhwa-list {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.manhwa-list .wish-card {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "photo title top"
+    "photo meta top"
+    "photo note top";
+  column-gap: 12px;
+  row-gap: 4px;
+  align-items: center;
+  padding: 10px 12px;
+  min-height: 106px;
+}
+
+.manhwa-list .card-top {
+  grid-area: top;
+  align-self: start;
+  min-height: 0;
+  justify-content: flex-end;
+}
+
+.manhwa-list .wish-photo-link {
+  grid-area: photo;
+  width: 78px;
+  aspect-ratio: 1 / 1;
+  justify-self: start;
+  border-radius: 15px;
+}
+
+.manhwa-list .wish-photo-link.is-placeholder {
+  border-color: var(--blue-4);
+}
+
+.manhwa-list .wish-title {
+  grid-area: title;
+  font-size: 1rem;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.manhwa-list .wish-title-link {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manhwa-list .wish-meta-line {
+  grid-area: meta;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.manhwa-list .series-note {
+  grid-area: note;
+  margin: 0;
+  color: var(--muted);
+  opacity: 0.84;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manhwa-list .series-note[hidden] {
+  display: none;
+}
+
+.manhwa-list .menu-trigger {
+  opacity: 0.65;
+  width: 28px;
+  height: 28px;
+}
+
+.series-status {
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.series-status.status-reading {
+  border-color: var(--chip-active-border);
+  background: var(--chip-active-bg);
+  color: var(--text);
+}
+
+.series-status.status-paused {
+  border-color: var(--blue-3);
+  background: color-mix(in srgb, var(--card) 78%, var(--blue-5));
+}
+
+.series-status.status-completed {
+  border-color: var(--blue-4);
+  background: color-mix(in srgb, var(--card) 68%, var(--blue-5));
+  color: var(--text);
+}
+
 .empty-state {
   margin: 0;
   border: 1px dashed var(--border);
@@ -764,6 +891,14 @@ button {
   .wishlist.view-list .wish-photo-link {
     width: 74px;
   }
+
+  .manhwa-list .wish-card {
+    grid-template-columns: 74px minmax(0, 1fr) auto;
+  }
+
+  .manhwa-list .wish-photo-link {
+    width: 74px;
+  }
 }
 
 @media (max-width: 780px) {
@@ -777,6 +912,10 @@ button {
   }
 
   .view-switch {
+    width: 100%;
+  }
+
+  .page-nav {
     width: 100%;
   }
 
@@ -803,6 +942,15 @@ button {
     width: 72px;
   }
 
+  .manhwa-list .wish-card {
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    min-height: 92px;
+  }
+
+  .manhwa-list .wish-photo-link {
+    width: 72px;
+  }
+
   .advanced-grid {
     grid-template-columns: 1fr;
   }
@@ -825,5 +973,24 @@ button {
 
   .wishlist.view-list .card-top {
     justify-content: flex-end;
+  }
+
+  .manhwa-list .wish-card {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "title top"
+      "meta top"
+      "note note"
+      "photo photo";
+    align-items: start;
+  }
+
+  .manhwa-list .wish-photo-link {
+    width: 100%;
+    aspect-ratio: 5 / 3;
+  }
+
+  .manhwa-list .series-note {
+    white-space: normal;
   }
 }

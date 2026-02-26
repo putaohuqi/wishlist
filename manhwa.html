@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Manhwa Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="shortcut icon" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="manhwa.js" defer></script>
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div class="top-main">
+          <div>
+            <nav class="page-nav" aria-label="Site pages">
+              <a class="chip page-link" href="index.html">Wishlist</a>
+              <a class="chip page-link is-active" href="manhwa.html">Manhwa</a>
+            </nav>
+            <p class="subtitle">stories i am reading ♡</p>
+            <h1>manhwa tracker ✦</h1>
+            <p id="header-stats" class="header-stats">0 series • 0 reading</p>
+            <p class="reorder-hint">track your chapter progress and status</p>
+          </div>
+          <button id="open-add" class="add-btn" type="button">+ Add</button>
+        </div>
+
+        <div class="tool-row">
+          <label class="search-wrap" for="search">
+            <span class="sr-only">Search tracker</span>
+            <input id="search" type="search" placeholder="Search title, chapter, rating, or note" />
+          </label>
+
+          <div class="filters" aria-label="Manhwa filters">
+            <button type="button" class="chip is-active" data-filter="all">All</button>
+            <button type="button" class="chip" data-filter="reading">Reading</button>
+            <button type="button" class="chip" data-filter="paused">Paused</button>
+            <button type="button" class="chip" data-filter="completed">Completed</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="cards-section">
+        <ul id="manhwa-list" class="wishlist manhwa-list" aria-live="polite"></ul>
+        <p id="empty-state" class="empty-state" hidden>
+          No series match this filter yet.
+        </p>
+
+        <template id="manhwa-template">
+          <li class="wish-card series-card">
+            <div class="card-top">
+              <span class="series-status"></span>
+              <details class="card-menu">
+                <summary class="menu-trigger" aria-label="More options">⋯</summary>
+                <div class="menu-panel">
+                  <button type="button" data-action="edit-item">Edit</button>
+                  <button type="button" data-action="cycle-status">Next status</button>
+                  <button type="button" data-action="delete">Delete</button>
+                </div>
+              </details>
+            </div>
+
+            <a class="wish-photo-link" target="_blank" rel="noopener noreferrer" draggable="false">
+              <img class="wish-photo" loading="lazy" alt="" draggable="false" />
+            </a>
+
+            <h3 class="wish-title">
+              <a class="wish-title-link" target="_blank" rel="noopener noreferrer" draggable="false"></a>
+            </h3>
+            <p class="wish-meta-line">
+              <span class="wish-meta-text"></span>
+            </p>
+            <p class="series-note" hidden></p>
+          </li>
+        </template>
+      </section>
+    </main>
+
+    <div id="modal-backdrop" class="modal-backdrop" hidden>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-head">
+          <h2 id="modal-title">Add a manhwa</h2>
+          <button id="close-add" class="close-btn" type="button">Close</button>
+        </div>
+
+        <form id="manhwa-form" class="wish-form">
+          <label for="title">Title *</label>
+          <input id="title" name="title" type="text" placeholder="Omniscient Reader's Viewpoint" required />
+
+          <label for="url">Link *</label>
+          <input id="url" name="url" type="url" placeholder="https://..." required />
+
+          <label for="cover">Cover image link</label>
+          <input id="cover" name="cover" type="url" placeholder="https://...jpg" />
+
+          <div class="advanced-grid">
+            <div class="field">
+              <label for="chapter">Current chapter</label>
+              <input id="chapter" name="chapter" type="text" placeholder="145" />
+            </div>
+
+            <div class="field">
+              <label for="status">Status</label>
+              <select id="status" name="status">
+                <option value="reading" selected>Reading</option>
+                <option value="paused">Paused</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="rating">Rating</label>
+              <select id="rating" name="rating">
+                <option value="">No rating</option>
+                <option value="10">10</option>
+                <option value="9">9</option>
+                <option value="8">8</option>
+                <option value="7">7</option>
+                <option value="6">6</option>
+                <option value="5">5</option>
+                <option value="4">4</option>
+                <option value="3">3</option>
+                <option value="2">2</option>
+                <option value="1">1</option>
+              </select>
+            </div>
+
+            <div class="field field-full">
+              <label for="note">Notes</label>
+              <textarea id="note" name="note" rows="3" placeholder="Arc notes, where you stopped, favorite character..."></textarea>
+            </div>
+          </div>
+
+          <button id="save-series-btn" type="submit" class="add-btn">Save to tracker</button>
+        </form>
+      </section>
+    </div>
+
+    <div id="confirm-backdrop" class="confirm-backdrop" hidden>
+      <section class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <h2 id="confirm-title">Delete series?</h2>
+        <p id="confirm-message">This will remove the series from your tracker.</p>
+        <div class="confirm-actions">
+          <button id="confirm-cancel" type="button" class="close-btn">Cancel</button>
+          <button id="confirm-delete" type="button" class="confirm-btn">Delete</button>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>
