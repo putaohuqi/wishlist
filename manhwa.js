@@ -4,7 +4,12 @@ const COLOR_SAMPLE_SIZE = 24;
 const MAX_UPLOAD_BYTES = 1200 * 1024;
 const STATUSES = ["reading", "paused", "completed"];
 const SERIES_TYPES = ["manhwa", "manga", "manhua"];
-const SERIES_GENRES = ["bl", "isekai-romance", "modern", "action"];
+const SERIES_GENRES = ["bl", "romance-fantasy", "action-fantasy", "romance", "drama", "academy", "idol", "horror-revenge"];
+const LEGACY_GENRE_ALIASES = {
+  "isekai-romance": "romance-fantasy",
+  modern: "romance",
+  action: "action-fantasy"
+};
 const STATUS_LABELS = {
   reading: "Reading",
   paused: "Paused",
@@ -17,9 +22,13 @@ const TYPE_LABELS = {
 };
 const GENRE_LABELS = {
   bl: "BL",
-  "isekai-romance": "isekai/romance",
-  modern: "modern",
-  action: "action"
+  "romance-fantasy": "romance fantasy",
+  "action-fantasy": "action fantasy",
+  romance: "romance",
+  drama: "drama",
+  academy: "academy",
+  idol: "idol",
+  "horror-revenge": "horror/revenge"
 };
 
 const accentCache = new Map();
@@ -407,7 +416,7 @@ function openAddModal() {
   refs.form.reset();
   resetCoverInputs();
   refs.form.querySelector("#series-type").value = "manhwa";
-  refs.form.querySelector("#series-genre").value = "isekai-romance";
+  refs.form.querySelector("#series-genre").value = "romance-fantasy";
   refs.form.querySelector("#status").value = "reading";
   refs.form.querySelector("#rating").value = "";
   refs.modalTitle.textContent = "Add a manhwa";
@@ -819,10 +828,11 @@ function normalizeSeriesType(value) {
 
 function normalizeGenre(value) {
   const clean = getCleanValue(value).toLowerCase();
-  if (SERIES_GENRES.includes(clean)) {
-    return clean;
+  const mapped = LEGACY_GENRE_ALIASES[clean] || clean;
+  if (SERIES_GENRES.includes(mapped)) {
+    return mapped;
   }
-  return "isekai-romance";
+  return "romance-fantasy";
 }
 
 function normalizeRating(value) {
