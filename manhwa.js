@@ -10,6 +10,7 @@ const SERIES_GENRES = [
   "action",
   "romance",
   "drama",
+  "comedy",
   "academy",
   "idol",
   "slice-of-life",
@@ -20,7 +21,8 @@ const LEGACY_GENRE_ALIASES = {
   "isekai-romance": "romance-fantasy",
   modern: "romance",
   "action-fantasy": "action",
-  "horror-revenge": "revenge"
+  "horror-revenge": "revenge",
+  school: "academy"
 };
 const STATUS_LABELS = {
   reading: "Reading",
@@ -38,6 +40,7 @@ const GENRE_LABELS = {
   action: "action",
   romance: "romance",
   drama: "drama",
+  comedy: "comedy",
   academy: "academy",
   idol: "idol",
   "slice-of-life": "slice of life",
