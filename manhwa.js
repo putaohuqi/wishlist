@@ -57,7 +57,9 @@ const state = {
   genreFilter: "all",
   query: "",
   editingId: null,
-  pendingDeleteId: null
+  pendingDeleteId: null,
+  draggingId: null,
+  draggingListId: null
 };
 
 const refs = {
@@ -99,6 +101,10 @@ initialize();
 function initialize() {
   refs.form.addEventListener("submit", handleSubmit);
   refs.listsWrap.addEventListener("click", handleListClick);
+  refs.listsWrap.addEventListener("dragstart", handleCardDragStart);
+  refs.listsWrap.addEventListener("dragover", handleCardDragOver);
+  refs.listsWrap.addEventListener("drop", handleCardDrop);
+  refs.listsWrap.addEventListener("dragend", handleCardDragEnd);
   refs.search.addEventListener("input", handleSearch);
   refs.coverInput.addEventListener("input", handleCoverInputChange);
   refs.coverUploadButton.addEventListener("click", handleCoverUploadClick);
@@ -123,6 +129,7 @@ function initialize() {
     persistItems(state.items);
   }
 
+  ensureItemOrder();
   initializeCloudSync();
   setActiveFilterButton();
   setActiveTypeFilterButton();
@@ -154,6 +161,7 @@ function initializeCloudSync() {
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(syncedItems));
       state.items = loadItems();
+      ensureItemOrder();
       render();
     } catch (error) {
       console.error("Cloud sync failed for reads tracker:", error);
@@ -237,10 +245,12 @@ function handleSubmit(event) {
     });
   } else {
     const now = Date.now();
+    const frontOrder = getFrontOrder(state.items);
     state.items.unshift({
       id: createId(),
       createdAt: now,
       _updatedAt: now,
+      order: frontOrder,
       ...payload
     });
   }
@@ -295,6 +305,90 @@ function handleListClick(event) {
 function handleSearch(event) {
   state.query = getCleanValue(event.target.value).toLowerCase();
   render();
+}
+
+function handleCardDragStart(event) {
+  const card = event.target.closest(".wish-card");
+  if (!card || !card.draggable) {
+    return;
+  }
+
+  const listEl = card.closest(".manhwa-list");
+  if (!listEl) {
+    return;
+  }
+
+  state.draggingId = card.dataset.id;
+  state.draggingListId = listEl.id;
+  card.classList.add("is-dragging");
+
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", state.draggingId);
+  }
+}
+
+function handleCardDragOver(event) {
+  if (!state.draggingId) {
+    return;
+  }
+
+  const targetCard = event.target.closest(".wish-card");
+  const targetList = targetCard ? targetCard.closest(".manhwa-list") : event.target.closest(".manhwa-list");
+  clearDropTargets();
+
+  if (!targetList || targetList.id !== state.draggingListId) {
+    return;
+  }
+
+  event.preventDefault();
+  if (targetCard && targetCard.dataset.id !== state.draggingId) {
+    targetCard.classList.add("drop-target");
+  }
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "move";
+  }
+}
+
+function handleCardDrop(event) {
+  if (!state.draggingId) {
+    return;
+  }
+
+  const sourceId = state.draggingId;
+  const sourceListId = state.draggingListId;
+  const targetCard = event.target.closest(".wish-card");
+  const targetList = targetCard ? targetCard.closest(".manhwa-list") : event.target.closest(".manhwa-list");
+  clearDropTargets();
+
+  if (!targetList || targetList.id !== sourceListId) {
+    cleanupDragState();
+    return;
+  }
+
+  event.preventDefault();
+
+  if (!targetCard) {
+    reorderListItems(targetList, sourceId, null, false);
+    cleanupDragState();
+    return;
+  }
+
+  const targetId = targetCard.dataset.id;
+  if (!targetId || targetId === sourceId) {
+    cleanupDragState();
+    return;
+  }
+
+  const rect = targetCard.getBoundingClientRect();
+  const insertAfter = event.clientY > rect.top + rect.height / 2;
+  reorderListItems(targetList, sourceId, targetId, insertAfter);
+  cleanupDragState();
+}
+
+function handleCardDragEnd() {
+  cleanupDragState();
 }
 
 function handleCoverInputChange(event) {
@@ -398,6 +492,7 @@ function handleStorageSync(event) {
     return;
   }
   state.items = loadItems();
+  ensureItemOrder();
   render();
 }
 
@@ -617,17 +712,20 @@ function renderSection(listEl, emptyEl, items, visible) {
     return;
   }
 
+  const canDrag = items.length > 1;
   listEl.innerHTML = "";
   items.forEach((item) => {
-    listEl.append(createSeriesCard(item));
+    listEl.append(createSeriesCard(item, canDrag));
   });
 
   emptyEl.hidden = items.length !== 0;
 }
 
-function createSeriesCard(item) {
+function createSeriesCard(item, canDrag) {
   const card = refs.template.content.firstElementChild.cloneNode(true);
   card.dataset.id = item.id;
+  card.draggable = canDrag;
+  card.classList.toggle("is-draggable", canDrag);
   clearCardAccent(card);
 
   const statusPill = card.querySelector(".series-status");
@@ -696,8 +794,7 @@ function renderStats(items) {
 }
 
 function getVisibleItems(items, filter, typeFilter, genreFilter, query) {
-  return [...items]
-    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+  return getOrderedItems(items)
     .filter((item) => {
       if (filter === "all") {
         return true;
@@ -740,10 +837,11 @@ function loadItems() {
 
     return parsed
       .filter((item) => item && typeof item === "object")
-      .map((item) => ({
+      .map((item, index) => ({
         id: String(item.id || createId()),
         createdAt: normalizeTimestamp(item.createdAt, Date.now()),
         _updatedAt: normalizeTimestamp(item._updatedAt || item.updatedAt || item.createdAt, Date.now()),
+        order: normalizeOrder(item.order, index),
         title: String(item.title || "Untitled"),
         url: String(item.url || "#"),
         cover: String(item.cover || ""),
@@ -775,6 +873,14 @@ function persistItems(items) {
 function normalizeTimestamp(value, fallback) {
   const parsed = Number(value);
   if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return fallback;
+}
+
+function normalizeOrder(value, fallback) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
     return parsed;
   }
   return fallback;
@@ -879,6 +985,100 @@ function getLatestUpdate(items) {
     const nextValue = normalizeTimestamp(item._updatedAt || item.createdAt, 0);
     return nextValue > latest ? nextValue : latest;
   }, 0);
+}
+
+function getOrderedItems(items) {
+  return [...items].sort((a, b) => normalizeOrder(a.order, 0) - normalizeOrder(b.order, 0));
+}
+
+function ensureItemOrder() {
+  const ordered = getOrderedItems(state.items);
+  let changed = false;
+
+  state.items = ordered.map((item, index) => {
+    if (item.order !== index) {
+      changed = true;
+    }
+    return { ...item, order: index };
+  });
+
+  if (changed) {
+    persistItems(state.items);
+  }
+}
+
+function getFrontOrder(items) {
+  if (items.length === 0) {
+    return 0;
+  }
+
+  let minOrder = normalizeOrder(items[0].order, 0);
+  items.forEach((item) => {
+    const nextOrder = normalizeOrder(item.order, 0);
+    if (nextOrder < minOrder) {
+      minOrder = nextOrder;
+    }
+  });
+  return minOrder - 1;
+}
+
+function reorderListItems(listEl, sourceId, targetId, insertAfter) {
+  const visibleIds = Array.from(listEl.querySelectorAll(".wish-card"))
+    .map((card) => card.dataset.id)
+    .filter(Boolean);
+
+  if (!visibleIds.includes(sourceId)) {
+    return;
+  }
+
+  const reorderedVisibleIds = visibleIds.filter((id) => id !== sourceId);
+  if (targetId && reorderedVisibleIds.includes(targetId)) {
+    let targetIndex = reorderedVisibleIds.indexOf(targetId);
+    if (insertAfter) {
+      targetIndex += 1;
+    }
+    reorderedVisibleIds.splice(targetIndex, 0, sourceId);
+  } else {
+    reorderedVisibleIds.push(sourceId);
+  }
+
+  applyVisibleOrderToAllItems(reorderedVisibleIds);
+}
+
+function applyVisibleOrderToAllItems(reorderedVisibleIds) {
+  const ordered = getOrderedItems(state.items);
+  const visibleSet = new Set(reorderedVisibleIds);
+  const pointer = { value: 0 };
+
+  const nextGlobalIds = ordered.map((item) => {
+    if (!visibleSet.has(item.id)) {
+      return item.id;
+    }
+
+    const nextId = reorderedVisibleIds[pointer.value];
+    pointer.value += 1;
+    return nextId;
+  });
+
+  const itemById = new Map(state.items.map((item) => [item.id, item]));
+  state.items = nextGlobalIds.map((id, index) => {
+    const base = itemById.get(id);
+    return { ...base, order: index };
+  });
+
+  persistItems(state.items);
+  render();
+}
+
+function clearDropTargets() {
+  refs.listsWrap.querySelectorAll(".drop-target").forEach((card) => card.classList.remove("drop-target"));
+}
+
+function cleanupDragState() {
+  state.draggingId = null;
+  state.draggingListId = null;
+  refs.listsWrap.querySelectorAll(".is-dragging").forEach((card) => card.classList.remove("is-dragging"));
+  clearDropTargets();
 }
 
 function nextStatus(currentStatus) {
