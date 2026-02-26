@@ -7,7 +7,7 @@ const SERIES_TYPES = ["manhwa", "manga", "manhua"];
 const SERIES_GENRES = [
   "bl",
   "romance-fantasy",
-  "action-fantasy",
+  "action",
   "romance",
   "drama",
   "academy",
@@ -18,7 +18,7 @@ const SERIES_GENRES = [
 const LEGACY_GENRE_ALIASES = {
   "isekai-romance": "romance-fantasy",
   modern: "romance",
-  action: "action-fantasy"
+  "action-fantasy": "action"
 };
 const STATUS_LABELS = {
   reading: "Reading",
@@ -33,7 +33,7 @@ const TYPE_LABELS = {
 const GENRE_LABELS = {
   bl: "BL",
   "romance-fantasy": "romance fantasy",
-  "action-fantasy": "action fantasy",
+  action: "action",
   romance: "romance",
   drama: "drama",
   academy: "academy",
