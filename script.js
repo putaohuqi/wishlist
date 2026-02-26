@@ -30,18 +30,13 @@ const STARTER_ITEMS = [
   }
 ];
 
-const priorityRank = {
-  high: 0,
-  medium: 1,
-  low: 2
-};
-
 const state = {
   items: loadItems(),
   filter: "all",
   query: "",
   editingId: null,
-  pendingDeleteId: null
+  pendingDeleteId: null,
+  draggingId: null
 };
 
 const refs = {
@@ -67,6 +62,10 @@ initialize();
 function initialize() {
   refs.form.addEventListener("submit", handleSubmit);
   refs.list.addEventListener("click", handleListClick);
+  refs.list.addEventListener("dragstart", handleCardDragStart);
+  refs.list.addEventListener("dragover", handleCardDragOver);
+  refs.list.addEventListener("drop", handleCardDrop);
+  refs.list.addEventListener("dragend", handleCardDragEnd);
   refs.search.addEventListener("input", handleSearch);
   refs.filters.forEach((button) => button.addEventListener("click", handleFilterChange));
   refs.openAdd.addEventListener("click", openAddModal);
@@ -87,6 +86,7 @@ function initialize() {
 
   seedStarterItemsOnce();
   backfillStarterPhotos();
+  ensureItemOrder();
 
   setActiveFilterButton();
   render();
@@ -142,9 +142,11 @@ function handleSubmit(event) {
       };
     });
   } else {
+    const frontOrder = getFrontOrder(state.items);
     state.items.unshift({
       id: createId(),
       owned: false,
+      order: frontOrder,
       ...payload
     });
   }
@@ -195,6 +197,71 @@ function handleListClick(event) {
 function handleSearch(event) {
   state.query = getCleanValue(event.target.value).toLowerCase();
   render();
+}
+
+function handleCardDragStart(event) {
+  const card = event.target.closest(".wish-card");
+  if (!card || !card.draggable) {
+    return;
+  }
+
+  state.draggingId = card.dataset.id;
+  card.classList.add("is-dragging");
+
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", state.draggingId);
+  }
+}
+
+function handleCardDragOver(event) {
+  if (!state.draggingId) {
+    return;
+  }
+
+  event.preventDefault();
+  const targetCard = event.target.closest(".wish-card");
+
+  clearDropTargets();
+  if (targetCard && targetCard.dataset.id !== state.draggingId) {
+    targetCard.classList.add("drop-target");
+  }
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "move";
+  }
+}
+
+function handleCardDrop(event) {
+  if (!state.draggingId) {
+    return;
+  }
+
+  event.preventDefault();
+  const sourceId = state.draggingId;
+  const targetCard = event.target.closest(".wish-card");
+  clearDropTargets();
+
+  if (!targetCard) {
+    reorderVisibleItems(sourceId, null, false);
+    cleanupDragState();
+    return;
+  }
+
+  const targetId = targetCard.dataset.id;
+  if (!targetId || targetId === sourceId) {
+    cleanupDragState();
+    return;
+  }
+
+  const rect = targetCard.getBoundingClientRect();
+  const insertAfter = event.clientY > rect.top + rect.height / 2;
+  reorderVisibleItems(sourceId, targetId, insertAfter);
+  cleanupDragState();
+}
+
+function handleCardDragEnd() {
+  cleanupDragState();
 }
 
 function handleFilterChange(event) {
@@ -345,11 +412,14 @@ function setActiveFilterButton() {
 
 function render() {
   const filtered = getVisibleItems(state.items, state.filter, state.query);
+  const canDrag = filtered.length > 1;
 
   refs.list.innerHTML = "";
   filtered.forEach((item) => {
     const card = refs.template.content.firstElementChild.cloneNode(true);
     card.dataset.id = item.id;
+    card.draggable = canDrag;
+    card.classList.toggle("is-draggable", canDrag);
 
     card.querySelector(".wish-category").textContent = item.category;
 
@@ -417,7 +487,7 @@ function renderStats(items) {
 }
 
 function getVisibleItems(items, filter, query) {
-  return items
+  return getOrderedItems(items)
     .filter((item) => {
       if (filter === "open") {
         return !item.owned;
@@ -434,15 +504,6 @@ function getVisibleItems(items, filter, query) {
 
       const haystack = `${item.title} ${item.category} ${item.price} ${item.priority} ${item.size} ${item.color} ${item.note}`.toLowerCase();
       return haystack.includes(query);
-    })
-    .sort((a, b) => {
-      if (a.owned !== b.owned) {
-        return Number(a.owned) - Number(b.owned);
-      }
-      if (a.priority !== b.priority) {
-        return priorityRank[a.priority] - priorityRank[b.priority];
-      }
-      return a.title.localeCompare(b.title);
     });
 }
 
@@ -460,13 +521,14 @@ function loadItems() {
 
     return parsed
       .filter((item) => item && typeof item === "object")
-      .map((item) => ({
+      .map((item, index) => ({
         id: String(item.id || createId()),
         title: String(item.title || "Untitled item"),
         url: String(item.url || "#"),
         image: String(item.image || ""),
         category: String(item.category || "Other"),
         priority: normalizePriority(item.priority),
+        order: normalizeOrder(item.order, index),
         price: String(item.price || ""),
         size: String(item.size || ""),
         color: String(item.color || ""),
@@ -531,6 +593,102 @@ function normalizePriority(value) {
     return clean;
   }
   return "medium";
+}
+
+function normalizeOrder(value, fallback) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+  return fallback;
+}
+
+function getOrderedItems(items) {
+  return [...items].sort((a, b) => normalizeOrder(a.order, 0) - normalizeOrder(b.order, 0));
+}
+
+function ensureItemOrder() {
+  const ordered = getOrderedItems(state.items);
+  let changed = false;
+
+  state.items = ordered.map((item, index) => {
+    if (item.order !== index) {
+      changed = true;
+    }
+    return { ...item, order: index };
+  });
+
+  if (changed) {
+    persistItems(state.items);
+  }
+}
+
+function getFrontOrder(items) {
+  if (items.length === 0) {
+    return 0;
+  }
+  let minOrder = normalizeOrder(items[0].order, 0);
+  items.forEach((item) => {
+    const nextOrder = normalizeOrder(item.order, 0);
+    if (nextOrder < minOrder) {
+      minOrder = nextOrder;
+    }
+  });
+  return minOrder - 1;
+}
+
+function reorderVisibleItems(sourceId, targetId, insertAfter) {
+  const visibleIds = getVisibleItems(state.items, state.filter, state.query).map((item) => item.id);
+  if (!visibleIds.includes(sourceId)) {
+    return;
+  }
+
+  const reorderedVisibleIds = visibleIds.filter((id) => id !== sourceId);
+  if (targetId && reorderedVisibleIds.includes(targetId)) {
+    let targetIndex = reorderedVisibleIds.indexOf(targetId);
+    if (insertAfter) {
+      targetIndex += 1;
+    }
+    reorderedVisibleIds.splice(targetIndex, 0, sourceId);
+  } else {
+    reorderedVisibleIds.push(sourceId);
+  }
+
+  applyVisibleOrderToAllItems(reorderedVisibleIds);
+}
+
+function applyVisibleOrderToAllItems(reorderedVisibleIds) {
+  const ordered = getOrderedItems(state.items);
+  const visibleSet = new Set(reorderedVisibleIds);
+  const pointer = { value: 0 };
+
+  const nextGlobalIds = ordered.map((item) => {
+    if (!visibleSet.has(item.id)) {
+      return item.id;
+    }
+    const nextId = reorderedVisibleIds[pointer.value];
+    pointer.value += 1;
+    return nextId;
+  });
+
+  const itemById = new Map(state.items.map((item) => [item.id, item]));
+  state.items = nextGlobalIds.map((id, index) => {
+    const base = itemById.get(id);
+    return { ...base, order: index };
+  });
+
+  persistItems(state.items);
+  render();
+}
+
+function clearDropTargets() {
+  refs.list.querySelectorAll(".drop-target").forEach((card) => card.classList.remove("drop-target"));
+}
+
+function cleanupDragState() {
+  state.draggingId = null;
+  refs.list.querySelectorAll(".is-dragging").forEach((card) => card.classList.remove("is-dragging"));
+  clearDropTargets();
 }
 
 function normalizeRequiredUrl(value) {
