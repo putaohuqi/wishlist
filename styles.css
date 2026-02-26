@@ -1070,6 +1070,13 @@ button {
 }
 
 @media (max-width: 780px) {
+  .topbar {
+    position: static;
+    top: auto;
+    backdrop-filter: none;
+    padding: 14px 0 12px;
+  }
+
   .top-main {
     flex-direction: column;
     align-items: stretch;
@@ -1090,6 +1097,7 @@ button {
   .tool-row {
     flex-direction: column;
     align-items: stretch;
+    gap: 8px;
   }
 
   .tool-row-secondary {
@@ -1098,6 +1106,12 @@ button {
 
   .filters {
     width: 100%;
+    display: flex;
+    gap: 8px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
   }
 
   .view-switch {
@@ -1106,10 +1120,14 @@ button {
 
   .page-nav {
     width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
   }
 
   .chip {
-    flex: 1;
+    flex: 0 0 auto;
   }
 
   .auth-inline .chip {
@@ -1122,6 +1140,10 @@ button {
 
   .taxonomy-filters {
     width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
   }
 
   .taxonomy-filters .chip {
@@ -1149,6 +1171,7 @@ button {
 
   .manhwa-list .wish-card {
     grid-template-columns: 72px minmax(0, 1fr) auto;
+    padding: 10px 12px;
     min-height: 92px;
   }
 
@@ -1163,39 +1186,65 @@ button {
 
 @media (max-width: 560px) {
   .wishlist.view-list .wish-card {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
     grid-template-areas:
-      "title menu"
-      "meta menu"
-      "photo photo";
-    align-items: start;
+      "photo title menu"
+      "photo meta menu";
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 2px;
+    padding: 8px 10px;
+    min-height: 84px;
   }
 
   .wishlist.view-list .wish-photo-link {
-    width: 100%;
-    aspect-ratio: 4 / 3;
+    width: 64px;
+    aspect-ratio: 1 / 1;
   }
 
   .wishlist.view-list .card-top {
     justify-content: flex-end;
+    align-self: center;
+  }
+
+  .wishlist.view-list .wish-title {
+    font-size: 0.94rem;
+  }
+
+  .wishlist.view-list .wish-meta-line {
+    font-size: 0.78rem;
   }
 
   .manhwa-list .wish-card {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
     grid-template-areas:
-      "title top"
-      "meta top"
-      "note note"
-      "photo photo";
-    align-items: start;
+      "photo title top"
+      "photo meta top"
+      "photo note top";
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 2px;
+    padding: 8px 10px;
+    min-height: 88px;
   }
 
   .manhwa-list .wish-photo-link {
-    width: 100%;
-    aspect-ratio: 5 / 3;
+    width: 64px;
+    aspect-ratio: 1 / 1;
+  }
+
+  .manhwa-list .wish-title {
+    font-size: 0.94rem;
+  }
+
+  .manhwa-list .wish-meta-line,
+  .manhwa-list .series-note {
+    font-size: 0.78rem;
   }
 
   .manhwa-list .series-note {
-    white-space: normal;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
