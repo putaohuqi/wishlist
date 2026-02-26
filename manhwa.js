@@ -13,12 +13,14 @@ const SERIES_GENRES = [
   "academy",
   "idol",
   "slice-of-life",
-  "horror-revenge"
+  "horror",
+  "revenge"
 ];
 const LEGACY_GENRE_ALIASES = {
   "isekai-romance": "romance-fantasy",
   modern: "romance",
-  "action-fantasy": "action"
+  "action-fantasy": "action",
+  "horror-revenge": "revenge"
 };
 const STATUS_LABELS = {
   reading: "Reading",
@@ -39,7 +41,8 @@ const GENRE_LABELS = {
   academy: "academy",
   idol: "idol",
   "slice-of-life": "slice of life",
-  "horror-revenge": "horror/revenge"
+  horror: "horror",
+  revenge: "revenge"
 };
 
 const accentCache = new Map();
