@@ -4,7 +4,17 @@ const COLOR_SAMPLE_SIZE = 24;
 const MAX_UPLOAD_BYTES = 1200 * 1024;
 const STATUSES = ["reading", "paused", "completed"];
 const SERIES_TYPES = ["manhwa", "manga", "manhua"];
-const SERIES_GENRES = ["bl", "romance-fantasy", "action-fantasy", "romance", "drama", "academy", "idol", "horror-revenge"];
+const SERIES_GENRES = [
+  "bl",
+  "romance-fantasy",
+  "action-fantasy",
+  "romance",
+  "drama",
+  "academy",
+  "idol",
+  "slice-of-life",
+  "horror-revenge"
+];
 const LEGACY_GENRE_ALIASES = {
   "isekai-romance": "romance-fantasy",
   modern: "romance",
@@ -28,6 +38,7 @@ const GENRE_LABELS = {
   drama: "drama",
   academy: "academy",
   idol: "idol",
+  "slice-of-life": "slice of life",
   "horror-revenge": "horror/revenge"
 };
 
