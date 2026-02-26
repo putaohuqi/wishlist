@@ -156,7 +156,7 @@ function initializeCloudSync() {
       state.items = loadItems();
       render();
     } catch (error) {
-      console.error("Cloud sync failed for manhwa tracker:", error);
+      console.error("Cloud sync failed for reads tracker:", error);
     }
   };
 
@@ -436,7 +436,7 @@ function openAddModal() {
   refs.form.querySelector("#series-genre").value = "romance-fantasy";
   refs.form.querySelector("#status").value = "reading";
   refs.form.querySelector("#rating").value = "";
-  refs.modalTitle.textContent = "Add a manhwa";
+  refs.modalTitle.textContent = "Add a read";
   refs.saveSeriesButton.textContent = "Save to tracker";
   openModal();
   refs.form.querySelector("#title").focus();
