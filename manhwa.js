@@ -2,10 +2,23 @@ const STORAGE_KEY = "manhwa-items-v1";
 const COLOR_SAMPLE_SIZE = 24;
 const MAX_UPLOAD_BYTES = 1200 * 1024;
 const STATUSES = ["reading", "paused", "completed"];
+const SERIES_TYPES = ["manhwa", "manga", "manhua"];
+const SERIES_GENRES = ["bl", "isekai-romance", "modern", "action"];
 const STATUS_LABELS = {
   reading: "Reading",
   paused: "Paused",
   completed: "Completed"
+};
+const TYPE_LABELS = {
+  manhwa: "manhwa",
+  manga: "manga",
+  manhua: "manhua"
+};
+const GENRE_LABELS = {
+  bl: "BL",
+  "isekai-romance": "isekai/romance",
+  modern: "modern",
+  action: "action"
 };
 
 const accentCache = new Map();
@@ -13,6 +26,8 @@ const accentCache = new Map();
 const state = {
   items: loadItems(),
   filter: "all",
+  typeFilter: "all",
+  genreFilter: "all",
   query: "",
   editingId: null,
   pendingDeleteId: null
@@ -20,7 +35,15 @@ const state = {
 
 const refs = {
   form: document.getElementById("manhwa-form"),
-  list: document.getElementById("manhwa-list"),
+  listsWrap: document.getElementById("manhwa-lists"),
+  ongoingSection: document.getElementById("ongoing-section"),
+  completedSection: document.getElementById("completed-section"),
+  ongoingList: document.getElementById("ongoing-list"),
+  completedList: document.getElementById("completed-list"),
+  ongoingEmpty: document.getElementById("ongoing-empty"),
+  completedEmpty: document.getElementById("completed-empty"),
+  ongoingCount: document.getElementById("ongoing-count"),
+  completedCount: document.getElementById("completed-count"),
   template: document.getElementById("manhwa-template"),
   empty: document.getElementById("empty-state"),
   search: document.getElementById("search"),
@@ -31,6 +54,8 @@ const refs = {
   coverUploadClear: document.getElementById("cover-upload-clear"),
   coverUploadStatus: document.getElementById("cover-upload-status"),
   filters: Array.from(document.querySelectorAll("[data-filter]")),
+  typeFilters: Array.from(document.querySelectorAll("[data-type-filter]")),
+  genreFilters: Array.from(document.querySelectorAll("[data-genre-filter]")),
   stats: document.getElementById("header-stats"),
   openAdd: document.getElementById("open-add"),
   closeAdd: document.getElementById("close-add"),
@@ -46,13 +71,15 @@ initialize();
 
 function initialize() {
   refs.form.addEventListener("submit", handleSubmit);
-  refs.list.addEventListener("click", handleListClick);
+  refs.listsWrap.addEventListener("click", handleListClick);
   refs.search.addEventListener("input", handleSearch);
   refs.coverInput.addEventListener("input", handleCoverInputChange);
   refs.coverUploadButton.addEventListener("click", handleCoverUploadClick);
   refs.coverFileInput.addEventListener("change", handleCoverFileChange);
   refs.coverUploadClear.addEventListener("click", clearUploadedCover);
   refs.filters.forEach((button) => button.addEventListener("click", handleFilterChange));
+  refs.typeFilters.forEach((button) => button.addEventListener("click", handleTypeFilterChange));
+  refs.genreFilters.forEach((button) => button.addEventListener("click", handleGenreFilterChange));
   refs.openAdd.addEventListener("click", openAddModal);
   refs.closeAdd.addEventListener("click", closeModal);
   refs.modalBackdrop.addEventListener("click", handleModalBackdropClick);
@@ -70,6 +97,8 @@ function initialize() {
   }
 
   setActiveFilterButton();
+  setActiveTypeFilterButton();
+  setActiveGenreFilterButton();
   resetCoverInputs();
   render();
 }
@@ -82,6 +111,8 @@ function handleSubmit(event) {
   const urlValue = getCleanValue(formData.get("url"));
   const coverValue = getCleanValue(formData.get("cover"));
   const coverDataValue = getCleanValue(formData.get("coverData"));
+  const seriesType = normalizeSeriesType(formData.get("seriesType"));
+  const genre = normalizeGenre(formData.get("genre"));
   const chapter = getCleanValue(formData.get("chapter"));
   const status = normalizeStatus(formData.get("status"));
   const rating = normalizeRating(formData.get("rating"));
@@ -107,6 +138,8 @@ function handleSubmit(event) {
     title,
     url: parsedUrl,
     cover: parsedCover,
+    seriesType,
+    genre,
     chapter,
     status,
     rating,
@@ -255,6 +288,28 @@ function handleFilterChange(event) {
   render();
 }
 
+function handleTypeFilterChange(event) {
+  const nextFilter = event.currentTarget.dataset.typeFilter;
+  if (!nextFilter) {
+    return;
+  }
+
+  state.typeFilter = nextFilter;
+  setActiveTypeFilterButton();
+  render();
+}
+
+function handleGenreFilterChange(event) {
+  const nextFilter = event.currentTarget.dataset.genreFilter;
+  if (!nextFilter) {
+    return;
+  }
+
+  state.genreFilter = nextFilter;
+  setActiveGenreFilterButton();
+  render();
+}
+
 function handleStorageSync(event) {
   if (event.key !== STORAGE_KEY) {
     return;
@@ -294,6 +349,8 @@ function openAddModal() {
   state.editingId = null;
   refs.form.reset();
   resetCoverInputs();
+  refs.form.querySelector("#series-type").value = "manhwa";
+  refs.form.querySelector("#series-genre").value = "isekai-romance";
   refs.form.querySelector("#status").value = "reading";
   refs.form.querySelector("#rating").value = "";
   refs.modalTitle.textContent = "Add a manhwa";
@@ -312,6 +369,8 @@ function openEditModal(id) {
   refs.form.querySelector("#title").value = item.title;
   refs.form.querySelector("#url").value = item.url;
   populateCoverInputs(item.cover || "");
+  refs.form.querySelector("#series-type").value = normalizeSeriesType(item.seriesType);
+  refs.form.querySelector("#series-genre").value = normalizeGenre(item.genre);
   refs.form.querySelector("#chapter").value = item.chapter || "";
   refs.form.querySelector("#status").value = normalizeStatus(item.status);
   refs.form.querySelector("#rating").value = normalizeRating(item.rating);
@@ -420,62 +479,113 @@ function setActiveFilterButton() {
   });
 }
 
-function render() {
-  const visibleItems = getVisibleItems(state.items, state.filter, state.query);
-  refs.list.innerHTML = "";
-
-  visibleItems.forEach((item) => {
-    const card = refs.template.content.firstElementChild.cloneNode(true);
-    card.dataset.id = item.id;
-    clearCardAccent(card);
-
-    const statusPill = card.querySelector(".series-status");
-    statusPill.textContent = STATUS_LABELS[normalizeStatus(item.status)];
-    statusPill.classList.add(`status-${normalizeStatus(item.status)}`);
-
-    const photoLink = card.querySelector(".wish-photo-link");
-    const photo = card.querySelector(".wish-photo");
-    if (item.cover) {
-      photo.addEventListener(
-        "error",
-        () => {
-          setPlaceholderCover(photo, photoLink, item.title);
-        },
-        { once: true }
-      );
-      photo.src = item.cover;
-      photo.alt = `${item.title} cover`;
-      photoLink.href = item.url;
-      photoLink.classList.remove("is-placeholder");
-      applyCardAccentFromImage(card, photo, item.cover);
-    } else {
-      setPlaceholderCover(photo, photoLink, item.title);
-      photoLink.href = item.url;
-    }
-
-    const titleLink = card.querySelector(".wish-title-link");
-    titleLink.textContent = item.title;
-    titleLink.href = item.url;
-
-    card.querySelector(".wish-meta-text").textContent = buildMetaLine(item);
-
-    const note = card.querySelector(".series-note");
-    if (item.note) {
-      note.hidden = false;
-      note.textContent = item.note;
-    } else {
-      note.hidden = true;
-      note.textContent = "";
-    }
-
-    const cycleButton = card.querySelector("[data-action='cycle-status']");
-    cycleButton.textContent = `Set ${STATUS_LABELS[nextStatus(item.status)].toLowerCase()}`;
-
-    refs.list.append(card);
+function setActiveTypeFilterButton() {
+  refs.typeFilters.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.typeFilter === state.typeFilter);
   });
+}
+
+function setActiveGenreFilterButton() {
+  refs.genreFilters.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.genreFilter === state.genreFilter);
+  });
+}
+
+function render() {
+  const visibleItems = getVisibleItems(state.items, state.filter, state.typeFilter, state.genreFilter, state.query);
+  const ongoingItems = visibleItems.filter((item) => normalizeStatus(item.status) !== "completed");
+  const completedItems = visibleItems.filter((item) => normalizeStatus(item.status) === "completed");
+
+  refs.ongoingCount.textContent = `${ongoingItems.length} series`;
+  refs.completedCount.textContent = `${completedItems.length} series`;
 
   refs.empty.hidden = visibleItems.length !== 0;
+  if (visibleItems.length === 0) {
+    refs.ongoingSection.hidden = true;
+    refs.completedSection.hidden = true;
+    refs.ongoingList.innerHTML = "";
+    refs.completedList.innerHTML = "";
+    refs.ongoingEmpty.hidden = true;
+    refs.completedEmpty.hidden = true;
+    renderStats(state.items);
+    return;
+  }
+
+  const showOngoing = state.filter !== "completed";
+  const showCompleted = state.filter !== "reading" && state.filter !== "paused";
+
+  refs.ongoingSection.hidden = !showOngoing;
+  refs.completedSection.hidden = !showCompleted;
+
+  renderSection(refs.ongoingList, refs.ongoingEmpty, ongoingItems, showOngoing);
+  renderSection(refs.completedList, refs.completedEmpty, completedItems, showCompleted);
+
   renderStats(state.items);
+}
+
+function renderSection(listEl, emptyEl, items, visible) {
+  if (!visible) {
+    listEl.innerHTML = "";
+    emptyEl.hidden = true;
+    return;
+  }
+
+  listEl.innerHTML = "";
+  items.forEach((item) => {
+    listEl.append(createSeriesCard(item));
+  });
+
+  emptyEl.hidden = items.length !== 0;
+}
+
+function createSeriesCard(item) {
+  const card = refs.template.content.firstElementChild.cloneNode(true);
+  card.dataset.id = item.id;
+  clearCardAccent(card);
+
+  const statusPill = card.querySelector(".series-status");
+  statusPill.textContent = STATUS_LABELS[normalizeStatus(item.status)];
+  statusPill.classList.add(`status-${normalizeStatus(item.status)}`);
+
+  const photoLink = card.querySelector(".wish-photo-link");
+  const photo = card.querySelector(".wish-photo");
+  if (item.cover) {
+    photo.addEventListener(
+      "error",
+      () => {
+        setPlaceholderCover(photo, photoLink, item.title);
+      },
+      { once: true }
+    );
+    photo.src = item.cover;
+    photo.alt = `${item.title} cover`;
+    photoLink.href = item.url;
+    photoLink.classList.remove("is-placeholder");
+    applyCardAccentFromImage(card, photo, item.cover);
+  } else {
+    setPlaceholderCover(photo, photoLink, item.title);
+    photoLink.href = item.url;
+  }
+
+  const titleLink = card.querySelector(".wish-title-link");
+  titleLink.textContent = item.title;
+  titleLink.href = item.url;
+
+  card.querySelector(".wish-meta-text").textContent = buildMetaLine(item);
+
+  const note = card.querySelector(".series-note");
+  if (item.note) {
+    note.hidden = false;
+    note.textContent = item.note;
+  } else {
+    note.hidden = true;
+    note.textContent = "";
+  }
+
+  const cycleButton = card.querySelector("[data-action='cycle-status']");
+  cycleButton.textContent = `Set ${STATUS_LABELS[nextStatus(item.status)].toLowerCase()}`;
+
+  return card;
 }
 
 function buildMetaLine(item) {
@@ -483,6 +593,8 @@ function buildMetaLine(item) {
   if (item.chapter) {
     parts.push(`Ch. ${item.chapter}`);
   }
+  parts.push(TYPE_LABELS[normalizeSeriesType(item.seriesType)]);
+  parts.push(GENRE_LABELS[normalizeGenre(item.genre)]);
   parts.push(STATUS_LABELS[normalizeStatus(item.status)]);
   if (item.rating) {
     parts.push(`${item.rating}/10`);
@@ -496,7 +608,7 @@ function renderStats(items) {
   refs.stats.textContent = `${total} series • ${reading} reading`;
 }
 
-function getVisibleItems(items, filter, query) {
+function getVisibleItems(items, filter, typeFilter, genreFilter, query) {
   return [...items]
     .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
     .filter((item) => {
@@ -506,10 +618,23 @@ function getVisibleItems(items, filter, query) {
       return normalizeStatus(item.status) === filter;
     })
     .filter((item) => {
+      if (typeFilter === "all") {
+        return true;
+      }
+      return normalizeSeriesType(item.seriesType) === typeFilter;
+    })
+    .filter((item) => {
+      if (genreFilter === "all") {
+        return true;
+      }
+      return normalizeGenre(item.genre) === genreFilter;
+    })
+    .filter((item) => {
       if (!query) {
         return true;
       }
-      const haystack = `${item.title} ${item.chapter} ${item.status} ${item.rating} ${item.note}`.toLowerCase();
+      const haystack =
+        `${item.title} ${item.chapter} ${item.status} ${item.rating} ${item.note} ${item.seriesType} ${item.genre}`.toLowerCase();
       return haystack.includes(query);
     });
 }
@@ -534,6 +659,8 @@ function loadItems() {
         title: String(item.title || "Untitled"),
         url: String(item.url || "#"),
         cover: String(item.cover || ""),
+        seriesType: normalizeSeriesType(item.seriesType),
+        genre: normalizeGenre(item.genre),
         chapter: String(item.chapter || ""),
         status: normalizeStatus(item.status),
         rating: normalizeRating(item.rating),
@@ -601,6 +728,22 @@ function normalizeStatus(value) {
     return clean;
   }
   return "reading";
+}
+
+function normalizeSeriesType(value) {
+  const clean = getCleanValue(value).toLowerCase();
+  if (SERIES_TYPES.includes(clean)) {
+    return clean;
+  }
+  return "manhwa";
+}
+
+function normalizeGenre(value) {
+  const clean = getCleanValue(value).toLowerCase();
+  if (SERIES_GENRES.includes(clean)) {
+    return clean;
+  }
+  return "isekai-romance";
 }
 
 function normalizeRating(value) {

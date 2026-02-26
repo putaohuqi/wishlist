@@ -1,37 +1,7 @@
 const STORAGE_KEY = "wishlist-items-v1";
-const SEED_FLAG_KEY = "wishlist-seeded-cider-v2";
 const COLOR_SAMPLE_SIZE = 24;
 
 const accentCache = new Map();
-
-const STARTER_ITEMS = [
-  {
-    id: "starter-cider-1",
-    title: "Knit Two Tone Ruffle Trim Drawstring Knotted Cinched Waist Cardigan",
-    url: "https://www.shopcider.com/goods/knit-colorblock-long-sleeve-ruffle-trim-knotted-cinched-waist-cardigan-114794624",
-    image: "https://img1.shopcider.com/product/1753078093000-mZaDWe.jpg",
-    category: "Fashion",
-    priority: "medium",
-    price: "",
-    size: "",
-    color: "Dark Navy",
-    note: "",
-    owned: false
-  },
-  {
-    id: "starter-cider-2",
-    title: "100% Cotton Peter Pan Collar Bowknot Pocket Button Oversized Blouse",
-    url: "https://www.shopcider.com/goods/100-cotton-collar-ruched-oversized-short-sleeve-blouse-114769752",
-    image: "https://img1.shopcider.com/product/1753760375000-nhjaBM.jpg",
-    category: "Fashion",
-    priority: "low",
-    price: "",
-    size: "",
-    color: "White",
-    note: "",
-    owned: false
-  }
-];
 
 const state = {
   items: loadItems(),
@@ -88,8 +58,6 @@ function initialize() {
     persistItems(state.items);
   }
 
-  seedStarterItemsOnce();
-  backfillStarterPhotos();
   ensureItemOrder();
 
   setActiveFilterButton();
@@ -509,12 +477,12 @@ function loadItems() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return STARTER_ITEMS.map((item) => ({ ...item }));
+      return [];
     }
 
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) {
-      return STARTER_ITEMS.map((item) => ({ ...item }));
+      return [];
     }
 
     return parsed
@@ -534,55 +502,12 @@ function loadItems() {
         owned: Boolean(item.owned)
       }));
   } catch {
-    return STARTER_ITEMS.map((item) => ({ ...item }));
+    return [];
   }
 }
 
 function persistItems(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
-function seedStarterItemsOnce() {
-  if (localStorage.getItem(SEED_FLAG_KEY) === "true") {
-    return;
-  }
-
-  const existingUrls = new Set(state.items.map((item) => normalizeUrl(item.url)));
-  const missingItems = STARTER_ITEMS
-    .filter((item) => !existingUrls.has(normalizeUrl(item.url)))
-    .map((item) => ({ ...item }));
-
-  if (missingItems.length > 0) {
-    state.items = [...missingItems, ...state.items];
-    persistItems(state.items);
-  }
-
-  localStorage.setItem(SEED_FLAG_KEY, "true");
-}
-
-function backfillStarterPhotos() {
-  const photoByUrl = new Map(
-    STARTER_ITEMS.filter((item) => item.image).map((item) => [normalizeUrl(item.url), item.image])
-  );
-
-  let changed = false;
-  state.items = state.items.map((item) => {
-    if (item.image) {
-      return item;
-    }
-
-    const starterImage = photoByUrl.get(normalizeUrl(item.url));
-    if (!starterImage) {
-      return item;
-    }
-
-    changed = true;
-    return { ...item, image: starterImage };
-  });
-
-  if (changed) {
-    persistItems(state.items);
-  }
 }
 
 function normalizePriority(value) {

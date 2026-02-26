@@ -47,10 +47,54 @@
             <button type="button" class="chip" data-filter="completed">Completed</button>
           </div>
         </div>
+
+        <div class="tool-row tool-row-secondary">
+          <div class="taxonomy-group">
+            <p class="taxonomy-label">type</p>
+            <div class="taxonomy-filters" aria-label="Series type filters">
+              <button type="button" class="chip is-active" data-type-filter="all">all types</button>
+              <button type="button" class="chip" data-type-filter="manhwa">manhwa</button>
+              <button type="button" class="chip" data-type-filter="manga">manga</button>
+              <button type="button" class="chip" data-type-filter="manhua">manhua</button>
+            </div>
+          </div>
+
+          <div class="taxonomy-group">
+            <p class="taxonomy-label">genre</p>
+            <div class="taxonomy-filters" aria-label="Genre filters">
+              <button type="button" class="chip is-active" data-genre-filter="all">all genres</button>
+              <button type="button" class="chip" data-genre-filter="bl">BL</button>
+              <button type="button" class="chip" data-genre-filter="isekai-romance">isekai/romance</button>
+              <button type="button" class="chip" data-genre-filter="modern">modern</button>
+              <button type="button" class="chip" data-genre-filter="action">action</button>
+            </div>
+          </div>
+        </div>
       </header>
 
-      <section class="cards-section">
-        <ul id="manhwa-list" class="wishlist manhwa-list" aria-live="polite"></ul>
+      <section id="manhwa-lists" class="cards-section read-sections">
+        <section id="ongoing-section" class="read-section">
+          <div class="read-section-head">
+            <h2>ongoing reads</h2>
+            <p id="ongoing-count" class="section-count">0 series</p>
+          </div>
+          <ul id="ongoing-list" class="wishlist manhwa-list" aria-live="polite"></ul>
+          <p id="ongoing-empty" class="empty-state" hidden>
+            No ongoing reads in this filter.
+          </p>
+        </section>
+
+        <section id="completed-section" class="read-section">
+          <div class="read-section-head">
+            <h2>completed reads</h2>
+            <p id="completed-count" class="section-count">0 series</p>
+          </div>
+          <ul id="completed-list" class="wishlist manhwa-list" aria-live="polite"></ul>
+          <p id="completed-empty" class="empty-state" hidden>
+            No completed reads in this filter.
+          </p>
+        </section>
+
         <p id="empty-state" class="empty-state" hidden>
           No series match this filter yet.
         </p>
@@ -110,6 +154,25 @@
           </div>
 
           <div class="advanced-grid">
+            <div class="field">
+              <label for="series-type">Type</label>
+              <select id="series-type" name="seriesType">
+                <option value="manhwa" selected>manhwa</option>
+                <option value="manga">manga</option>
+                <option value="manhua">manhua</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="series-genre">Genre</label>
+              <select id="series-genre" name="genre">
+                <option value="bl">BL</option>
+                <option value="isekai-romance" selected>isekai/romance</option>
+                <option value="modern">modern</option>
+                <option value="action">action</option>
+              </select>
+            </div>
+
             <div class="field">
               <label for="chapter">Current chapter</label>
               <input id="chapter" name="chapter" type="text" placeholder="145" />
