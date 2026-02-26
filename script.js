@@ -491,8 +491,20 @@ function render() {
 }
 
 function buildMetaLine(item) {
-  const price = item.price ? item.price : "No price";
-  return `${price} · ${capitalize(item.priority)} priority`;
+  const pieces = [];
+
+  if (item.price) {
+    pieces.push(item.price);
+  }
+  if (item.color) {
+    pieces.push(item.color);
+  }
+  if (item.size) {
+    pieces.push(`Size ${item.size}`);
+  }
+
+  pieces.push(`${capitalize(item.priority)} priority`);
+  return pieces.join(" · ");
 }
 
 function renderStats(items) {
