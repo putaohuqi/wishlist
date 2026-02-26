@@ -1,6 +1,9 @@
 const STORAGE_KEY = "wishlist-items-v1";
 const SEED_FLAG_KEY = "wishlist-seeded-cider-v2";
 const VIEW_KEY = "wishlist-view-v1";
+const COLOR_SAMPLE_SIZE = 24;
+
+const accentCache = new Map();
 
 const STARTER_ITEMS = [
   {
@@ -457,14 +460,17 @@ function render() {
     card.dataset.id = item.id;
     card.draggable = canDrag;
     card.classList.toggle("is-draggable", canDrag);
+    clearCardAccent(card);
 
     const photoLink = card.querySelector(".wish-photo-link");
     const photo = card.querySelector(".wish-photo");
     const titleLink = card.querySelector(".wish-title-link");
     if (item.image) {
+      photo.crossOrigin = "anonymous";
       photo.src = item.image;
       photo.alt = item.title;
       photoLink.href = item.url;
+      applyCardAccentFromImage(card, photo, item.image);
     } else {
       photoLink.remove();
     }
@@ -707,6 +713,128 @@ function cleanupDragState() {
   state.draggingId = null;
   refs.list.querySelectorAll(".is-dragging").forEach((card) => card.classList.remove("is-dragging"));
   clearDropTargets();
+}
+
+function applyCardAccentFromImage(card, photo, imageUrl) {
+  const cacheKey = normalizeUrl(imageUrl);
+  const cachedAccent = accentCache.get(cacheKey);
+  if (cachedAccent) {
+    setCardAccent(card, cachedAccent);
+    return;
+  }
+
+  const assignAccent = () => {
+    const accent = extractDominantAccent(photo);
+    if (!accent) {
+      return;
+    }
+
+    accentCache.set(cacheKey, accent);
+    if (card.isConnected) {
+      setCardAccent(card, accent);
+    }
+  };
+
+  if (photo.complete && photo.naturalWidth > 0) {
+    assignAccent();
+    return;
+  }
+
+  photo.addEventListener("load", assignAccent, { once: true });
+}
+
+function setCardAccent(card, accentRgb) {
+  card.style.setProperty("--card-accent-rgb", accentRgb);
+  card.classList.add("has-accent");
+}
+
+function clearCardAccent(card) {
+  card.style.removeProperty("--card-accent-rgb");
+  card.classList.remove("has-accent");
+}
+
+function extractDominantAccent(photo) {
+  if (!photo.naturalWidth || !photo.naturalHeight) {
+    return "";
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = COLOR_SAMPLE_SIZE;
+  canvas.height = COLOR_SAMPLE_SIZE;
+
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) {
+    return "";
+  }
+
+  try {
+    context.drawImage(photo, 0, 0, COLOR_SAMPLE_SIZE, COLOR_SAMPLE_SIZE);
+  } catch {
+    return "";
+  }
+
+  let pixelData;
+  try {
+    pixelData = context.getImageData(0, 0, COLOR_SAMPLE_SIZE, COLOR_SAMPLE_SIZE).data;
+  } catch {
+    return "";
+  }
+
+  let redTotal = 0;
+  let greenTotal = 0;
+  let blueTotal = 0;
+  let weightTotal = 0;
+
+  for (let index = 0; index < pixelData.length; index += 4) {
+    const red = pixelData[index];
+    const green = pixelData[index + 1];
+    const blue = pixelData[index + 2];
+    const alpha = pixelData[index + 3] / 255;
+
+    if (alpha < 0.45) {
+      continue;
+    }
+
+    const max = Math.max(red, green, blue);
+    const min = Math.min(red, green, blue);
+    const saturation = max === 0 ? 0 : (max - min) / max;
+    const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
+
+    if (luminance > 0.95 || luminance < 0.08) {
+      continue;
+    }
+
+    const weight = (0.25 + saturation * 0.75) * alpha;
+    redTotal += red * weight;
+    greenTotal += green * weight;
+    blueTotal += blue * weight;
+    weightTotal += weight;
+  }
+
+  if (weightTotal < 1) {
+    return "";
+  }
+
+  const softened = softenAccentColor({
+    red: Math.round(redTotal / weightTotal),
+    green: Math.round(greenTotal / weightTotal),
+    blue: Math.round(blueTotal / weightTotal)
+  });
+
+  return `${softened.red} ${softened.green} ${softened.blue}`;
+}
+
+function softenAccentColor(color) {
+  const blend = 0.2;
+  return {
+    red: blendChannel(color.red, 255, blend),
+    green: blendChannel(color.green, 255, blend),
+    blue: blendChannel(color.blue, 255, blend)
+  };
+}
+
+function blendChannel(source, target, amount) {
+  return Math.round(source * (1 - amount) + target * amount);
 }
 
 function normalizeRequiredUrl(value) {

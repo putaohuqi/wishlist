@@ -259,6 +259,7 @@ button {
 }
 
 .wish-card {
+  --card-accent-rgb: 157 184 225;
   position: relative;
   border: 1px solid var(--card-edge);
   border-radius: var(--radius);
@@ -287,6 +288,12 @@ button {
   transform: translateY(-2px);
   border-color: var(--blue-4);
   box-shadow: var(--card-hover-shadow);
+}
+
+.wish-card.has-accent:hover,
+.wish-card.has-accent:focus-within {
+  border-color: rgb(var(--card-accent-rgb) / 0.35);
+  box-shadow: 0 10px 24px rgb(var(--card-accent-rgb) / 0.16);
 }
 
 .wish-card.is-dragging {
@@ -444,6 +451,7 @@ button {
   border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
   aspect-ratio: 16 / 10;
   padding: 0;
+  transition: border-color 200ms ease;
 }
 
 .wishlist.view-grid .wish-photo {
@@ -475,6 +483,16 @@ button {
 .wishlist.view-grid .wish-card:hover,
 .wishlist.view-grid .wish-card:focus-within {
   border-color: var(--grid-edge-hover);
+}
+
+.wishlist.view-grid .wish-card.has-accent:hover,
+.wishlist.view-grid .wish-card.has-accent:focus-within {
+  border-color: rgb(var(--card-accent-rgb) / 0.32);
+  box-shadow: 0 12px 26px rgb(var(--card-accent-rgb) / 0.2);
+}
+
+.wishlist.view-grid .wish-card.has-accent .wish-photo-link {
+  border-bottom-color: rgb(var(--card-accent-rgb) / 0.2);
 }
 
 .wishlist.view-list {
