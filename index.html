@@ -4,144 +4,150 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wishlist</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="styles.css" />
     <script src="script.js" defer></script>
   </head>
   <body>
-    <div class="bg-shape bg-shape-one"></div>
-    <div class="bg-shape bg-shape-two"></div>
-
-    <main class="page">
-      <header class="hero reveal">
-        <p class="eyebrow">MY WISH CORNER</p>
-        <h1>Wishlist</h1>
-        <p class="hero-copy">
-          Save the things you want and keep the product links in one place.
-        </p>
-      </header>
-
-      <section class="panel reveal delay-1">
-        <h2 class="panel-title">Add a wish</h2>
-        <form id="wish-form" class="wish-form">
-          <label for="title">Item name</label>
-          <input id="title" name="title" type="text" placeholder="Sony WH-1000XM5" required />
-
-          <label for="url">Product link</label>
-          <input id="url" name="url" type="url" placeholder="https://..." required />
-
-          <label for="image">Photo link (optional)</label>
-          <input id="image" name="image" type="url" placeholder="https://...jpg" />
-
-          <label for="category">Category</label>
-          <select id="category" name="category">
-            <option value="Tech">Tech</option>
-            <option value="Fashion">Fashion</option>
-            <option value="Home">Home</option>
-            <option value="Books">Books</option>
-            <option value="Games">Games</option>
-            <option value="Other">Other</option>
-          </select>
-
-          <label for="priority">Priority</label>
-          <select id="priority" name="priority">
-            <option value="high">High</option>
-            <option value="medium" selected>Medium</option>
-            <option value="low">Low</option>
-          </select>
-
-          <label for="price">Price (optional)</label>
-          <input id="price" name="price" type="text" placeholder="$299 or wait for sale" />
-
-          <label for="size">Size (optional)</label>
-          <input id="size" name="size" type="text" placeholder="XS, S, M, L..." />
-
-          <label for="color">Color (optional)</label>
-          <input id="color" name="color" type="text" placeholder="White, Dark Navy..." />
-
-          <label for="note">Note (optional)</label>
-          <textarea id="note" name="note" rows="2" placeholder="Any extra details..."></textarea>
-
-          <button type="submit" class="primary-btn">Add to wishlist</button>
-        </form>
-      </section>
-
-      <section class="toolbar reveal delay-2">
-        <div class="filters" aria-label="Filter wishes">
-          <button class="chip is-active" data-filter="all">All</button>
-          <button class="chip" data-filter="open">Not bought</button>
-          <button class="chip" data-filter="owned">Bought</button>
+    <main class="app">
+      <header class="topbar">
+        <div class="top-main">
+          <div>
+            <p class="subtitle">things i love ♡</p>
+            <h1>Wishlist</h1>
+            <p id="header-stats" class="header-stats">0 items • 0 not bought</p>
+          </div>
+          <button id="open-add" class="add-btn" type="button">+ Add</button>
         </div>
 
-        <label class="search-wrap" for="search">
-          <span class="sr-only">Search wishlist</span>
-          <input id="search" type="search" placeholder="Search item, size, color, or note..." />
-        </label>
-      </section>
+        <div class="tool-row">
+          <label class="search-wrap" for="search">
+            <span class="sr-only">Search wishlist</span>
+            <input id="search" type="search" placeholder="Search item, color, size, or note" />
+          </label>
 
-      <section class="stats reveal delay-2" aria-label="Wishlist stats">
-        <article class="stat-card">
-          <span id="count-total" class="stat-number">0</span>
-          <p class="stat-label">Total</p>
-        </article>
-        <article class="stat-card">
-          <span id="count-open" class="stat-number">0</span>
-          <p class="stat-label">Not bought</p>
-        </article>
-        <article class="stat-card">
-          <span id="count-owned" class="stat-number">0</span>
-          <p class="stat-label">Bought</p>
-        </article>
-      </section>
+          <div class="filters" aria-label="Wishlist filters">
+            <button type="button" class="chip is-active" data-filter="all">All</button>
+            <button type="button" class="chip" data-filter="open">Not bought</button>
+            <button type="button" class="chip" data-filter="owned">Bought</button>
+          </div>
+        </div>
+      </header>
 
-      <section class="list-section reveal delay-3">
+      <section class="cards-section">
         <ul id="wishlist" class="wishlist" aria-live="polite"></ul>
         <p id="empty-state" class="empty-state" hidden>
-          No wishes match this filter yet. Add one above.
+          No wishes match this filter yet.
         </p>
 
         <template id="wish-template">
           <li class="wish-card">
-            <div class="wish-top">
+            <div class="card-top">
               <span class="wish-category"></span>
-              <button type="button" class="icon-btn" data-action="delete" aria-label="Delete item">
-                Delete
-              </button>
+
+              <details class="card-menu">
+                <summary class="menu-trigger" aria-label="More options">⋯</summary>
+                <div class="menu-panel">
+                  <button type="button" data-action="edit-item">Edit</button>
+                  <button type="button" data-action="toggle-owned">Mark bought</button>
+                  <button type="button" data-action="delete">Delete</button>
+                </div>
+              </details>
             </div>
 
             <a class="wish-photo-link" target="_blank" rel="noopener noreferrer">
               <img class="wish-photo" loading="lazy" alt="" />
             </a>
 
-            <h3 class="wish-title"></h3>
-            <p class="wish-note"></p>
-
-            <div class="wish-meta">
-              <span class="pill wish-price"></span>
-              <span class="pill wish-size"></span>
-              <span class="pill wish-color"></span>
-              <span class="pill wish-priority"></span>
-            </div>
-
-            <div class="wish-actions">
-              <button type="button" class="ghost-btn" data-action="edit-item">Edit item</button>
-              <a class="link-btn" target="_blank" rel="noopener noreferrer">View item</a>
-              <button type="button" class="ghost-btn" data-action="toggle-owned"></button>
-            </div>
+            <h3 class="wish-title">
+              <a class="wish-title-link" target="_blank" rel="noopener noreferrer"></a>
+            </h3>
+            <p class="wish-meta-line">
+              <span class="wish-meta-text"></span>
+              <span class="priority-tag"></span>
+            </p>
           </li>
         </template>
       </section>
-
-      <footer class="footer">
-        <p>
-          Starter for GitHub Pages. Your list is saved in this browser.
-        </p>
-      </footer>
     </main>
+
+    <div id="modal-backdrop" class="modal-backdrop" hidden>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-head">
+          <h2 id="modal-title">Add a wish</h2>
+          <button id="close-add" class="close-btn" type="button">Close</button>
+        </div>
+
+        <form id="wish-form" class="wish-form">
+          <label for="title">Item name *</label>
+          <input id="title" name="title" type="text" placeholder="Knit cardigan" required />
+
+          <label for="url">Link *</label>
+          <input id="url" name="url" type="url" placeholder="https://..." required />
+
+          <label for="category">Category *</label>
+          <select id="category" name="category" required>
+            <option value="Fashion">Fashion</option>
+            <option value="Tech">Tech</option>
+            <option value="Home">Home</option>
+            <option value="Books">Books</option>
+            <option value="Games">Games</option>
+            <option value="Other">Other</option>
+          </select>
+
+          <details class="advanced">
+            <summary>Advanced</summary>
+
+            <div class="advanced-grid">
+              <div class="field">
+                <label for="image">Photo link</label>
+                <input id="image" name="image" type="url" placeholder="https://...jpg" />
+              </div>
+
+              <div class="field">
+                <label for="priority">Priority</label>
+                <select id="priority" name="priority">
+                  <option value="high">High</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="price">Price</label>
+                <input id="price" name="price" type="text" placeholder="$39" />
+              </div>
+
+              <div class="field">
+                <label for="size">Size</label>
+                <input id="size" name="size" type="text" placeholder="XS, S, M" />
+              </div>
+
+              <div class="field field-full">
+                <label for="color">Color</label>
+                <input id="color" name="color" type="text" placeholder="Dark Navy" />
+              </div>
+
+              <div class="field field-full">
+                <label for="note">Note</label>
+                <textarea id="note" name="note" rows="3" placeholder="Any extra details"></textarea>
+              </div>
+            </div>
+          </details>
+
+          <button id="save-wish-btn" type="submit" class="add-btn">Add to wishlist</button>
+        </form>
+      </section>
+    </div>
+
+    <div id="confirm-backdrop" class="confirm-backdrop" hidden>
+      <section class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <h2 id="confirm-title">Delete wish?</h2>
+        <p id="confirm-message">This will remove the item from your wishlist.</p>
+        <div class="confirm-actions">
+          <button id="confirm-cancel" type="button" class="close-btn">Cancel</button>
+          <button id="confirm-delete" type="button" class="confirm-btn">Delete</button>
+        </div>
+      </section>
+    </div>
   </body>
 </html>
