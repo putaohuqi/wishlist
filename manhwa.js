@@ -327,17 +327,21 @@ function render() {
     const photoLink = card.querySelector(".wish-photo-link");
     const photo = card.querySelector(".wish-photo");
     if (item.cover) {
-      photo.crossOrigin = "anonymous";
+      photo.addEventListener(
+        "error",
+        () => {
+          setPlaceholderCover(photo, photoLink, item.title);
+        },
+        { once: true }
+      );
       photo.src = item.cover;
       photo.alt = `${item.title} cover`;
       photoLink.href = item.url;
       photoLink.classList.remove("is-placeholder");
       applyCardAccentFromImage(card, photo, item.cover);
     } else {
-      photo.src = createCoverPlaceholder(item.title);
-      photo.alt = `${item.title} cover placeholder`;
+      setPlaceholderCover(photo, photoLink, item.title);
       photoLink.href = item.url;
-      photoLink.classList.add("is-placeholder");
     }
 
     const titleLink = card.querySelector(".wish-title-link");
@@ -526,6 +530,12 @@ function createCoverPlaceholder(title) {
     </svg>
   `;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function setPlaceholderCover(photo, photoLink, title) {
+  photo.src = createCoverPlaceholder(title);
+  photo.alt = `${title} cover placeholder`;
+  photoLink.classList.add("is-placeholder");
 }
 
 function applyCardAccentFromImage(card, photo, imageUrl) {

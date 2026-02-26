@@ -437,7 +437,6 @@ function render() {
     const photo = card.querySelector(".wish-photo");
     const titleLink = card.querySelector(".wish-title-link");
     if (item.image) {
-      photo.crossOrigin = "anonymous";
       photo.src = item.image;
       photo.alt = item.title;
       photoLink.href = item.url;
