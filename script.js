@@ -1,5 +1,6 @@
 const STORAGE_KEY = "wishlist-items-v1";
 const SEED_FLAG_KEY = "wishlist-seeded-cider-v2";
+const VIEW_KEY = "wishlist-view-v1";
 
 const STARTER_ITEMS = [
   {
@@ -34,6 +35,7 @@ const state = {
   items: loadItems(),
   filter: "all",
   query: "",
+  view: loadView(),
   editingId: null,
   pendingDeleteId: null,
   draggingId: null
@@ -46,6 +48,7 @@ const refs = {
   empty: document.getElementById("empty-state"),
   search: document.getElementById("search"),
   filters: Array.from(document.querySelectorAll("[data-filter]")),
+  viewButtons: Array.from(document.querySelectorAll("[data-view]")),
   stats: document.getElementById("header-stats"),
   openAdd: document.getElementById("open-add"),
   closeAdd: document.getElementById("close-add"),
@@ -68,6 +71,7 @@ function initialize() {
   refs.list.addEventListener("dragend", handleCardDragEnd);
   refs.search.addEventListener("input", handleSearch);
   refs.filters.forEach((button) => button.addEventListener("click", handleFilterChange));
+  refs.viewButtons.forEach((button) => button.addEventListener("click", handleViewChange));
   refs.openAdd.addEventListener("click", openAddModal);
   refs.closeAdd.addEventListener("click", closeModal);
   refs.modalBackdrop.addEventListener("click", handleModalBackdropClick);
@@ -89,6 +93,8 @@ function initialize() {
   ensureItemOrder();
 
   setActiveFilterButton();
+  setActiveViewButton();
+  applyViewClass();
   render();
 }
 
@@ -275,7 +281,26 @@ function handleFilterChange(event) {
   render();
 }
 
+function handleViewChange(event) {
+  const nextView = event.currentTarget.dataset.view;
+  if (nextView !== "grid" && nextView !== "list") {
+    return;
+  }
+
+  state.view = nextView;
+  localStorage.setItem(VIEW_KEY, nextView);
+  setActiveViewButton();
+  applyViewClass();
+}
+
 function handleStorageSync(event) {
+  if (event.key === VIEW_KEY) {
+    state.view = loadView();
+    setActiveViewButton();
+    applyViewClass();
+    return;
+  }
+
   if (event.key !== STORAGE_KEY) {
     return;
   }
@@ -410,9 +435,21 @@ function setActiveFilterButton() {
   });
 }
 
+function setActiveViewButton() {
+  refs.viewButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.view === state.view);
+  });
+}
+
+function applyViewClass() {
+  refs.list.classList.toggle("view-grid", state.view === "grid");
+  refs.list.classList.toggle("view-list", state.view === "list");
+}
+
 function render() {
   const filtered = getVisibleItems(state.items, state.filter, state.query);
   const canDrag = filtered.length > 1;
+  applyViewClass();
 
   refs.list.innerHTML = "";
   filtered.forEach((item) => {
@@ -420,8 +457,6 @@ function render() {
     card.dataset.id = item.id;
     card.draggable = canDrag;
     card.classList.toggle("is-draggable", canDrag);
-
-    card.querySelector(".wish-category").textContent = item.category;
 
     const photoLink = card.querySelector(".wish-photo-link");
     const photo = card.querySelector(".wish-photo");
@@ -439,10 +474,6 @@ function render() {
 
     card.querySelector(".wish-meta-text").textContent = buildMetaLine(item);
 
-    const priorityTag = card.querySelector(".priority-tag");
-    priorityTag.textContent = `${capitalize(item.priority)} priority`;
-    priorityTag.classList.add(`priority-${item.priority}`);
-
     const toggleOwned = card.querySelector("[data-action='toggle-owned']");
     toggleOwned.textContent = item.owned ? "Mark not bought" : "Mark bought";
 
@@ -454,29 +485,8 @@ function render() {
 }
 
 function buildMetaLine(item) {
-  const parts = [];
-
-  if (item.price) {
-    parts.push(item.price);
-  }
-
-  if (item.size) {
-    parts.push(`Size ${item.size}`);
-  }
-
-  if (item.color) {
-    parts.push(item.color);
-  }
-
-  if (item.note) {
-    parts.push(item.note);
-  }
-
-  if (parts.length === 0) {
-    return "No extra details";
-  }
-
-  return parts.join(" • ");
+  const price = item.price ? item.price : "No price";
+  return `${price} · ${capitalize(item.priority)} priority`;
 }
 
 function renderStats(items) {
@@ -542,6 +552,14 @@ function loadItems() {
 
 function persistItems(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+function loadView() {
+  const raw = localStorage.getItem(VIEW_KEY);
+  if (raw === "list") {
+    return "list";
+  }
+  return "grid";
 }
 
 function seedStarterItemsOnce() {

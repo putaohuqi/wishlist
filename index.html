@@ -13,7 +13,7 @@
         <div class="top-main">
           <div>
             <p class="subtitle">things i love ♡</p>
-            <h1>Wishlist ✦</h1>
+            <h1>wishlist ✦</h1>
             <p id="header-stats" class="header-stats">0 items • 0 not bought</p>
             <p class="reorder-hint">drag cards to reorder priority</p>
           </div>
@@ -31,11 +31,16 @@
             <button type="button" class="chip" data-filter="open">Not bought</button>
             <button type="button" class="chip" data-filter="owned">Bought</button>
           </div>
+
+          <div class="view-switch" aria-label="View type">
+            <button type="button" class="chip view-chip is-active" data-view="grid">Squares</button>
+            <button type="button" class="chip view-chip" data-view="list">List</button>
+          </div>
         </div>
       </header>
 
       <section class="cards-section">
-        <ul id="wishlist" class="wishlist" aria-live="polite"></ul>
+        <ul id="wishlist" class="wishlist view-grid" aria-live="polite"></ul>
         <p id="empty-state" class="empty-state" hidden>
           No wishes match this filter yet.
         </p>
@@ -43,8 +48,6 @@
         <template id="wish-template">
           <li class="wish-card">
             <div class="card-top">
-              <span class="wish-category"></span>
-
               <details class="card-menu">
                 <summary class="menu-trigger" aria-label="More options">⋯</summary>
                 <div class="menu-panel">
@@ -64,7 +67,6 @@
             </h3>
             <p class="wish-meta-line">
               <span class="wish-meta-text"></span>
-              <span class="priority-tag"></span>
             </p>
           </li>
         </template>
