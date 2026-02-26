@@ -1,6 +1,5 @@
 const STORAGE_KEY = "wishlist-items-v1";
 const SEED_FLAG_KEY = "wishlist-seeded-cider-v2";
-const VIEW_KEY = "wishlist-view-v1";
 const COLOR_SAMPLE_SIZE = 24;
 
 const accentCache = new Map();
@@ -38,7 +37,7 @@ const state = {
   items: loadItems(),
   filter: "all",
   query: "",
-  view: loadView(),
+  view: "list",
   editingId: null,
   pendingDeleteId: null,
   draggingId: null
@@ -51,7 +50,6 @@ const refs = {
   empty: document.getElementById("empty-state"),
   search: document.getElementById("search"),
   filters: Array.from(document.querySelectorAll("[data-filter]")),
-  viewButtons: Array.from(document.querySelectorAll("[data-view]")),
   stats: document.getElementById("header-stats"),
   openAdd: document.getElementById("open-add"),
   closeAdd: document.getElementById("close-add"),
@@ -74,7 +72,6 @@ function initialize() {
   refs.list.addEventListener("dragend", handleCardDragEnd);
   refs.search.addEventListener("input", handleSearch);
   refs.filters.forEach((button) => button.addEventListener("click", handleFilterChange));
-  refs.viewButtons.forEach((button) => button.addEventListener("click", handleViewChange));
   refs.openAdd.addEventListener("click", openAddModal);
   refs.closeAdd.addEventListener("click", closeModal);
   refs.modalBackdrop.addEventListener("click", handleModalBackdropClick);
@@ -96,7 +93,6 @@ function initialize() {
   ensureItemOrder();
 
   setActiveFilterButton();
-  setActiveViewButton();
   applyViewClass();
   render();
 }
@@ -284,26 +280,7 @@ function handleFilterChange(event) {
   render();
 }
 
-function handleViewChange(event) {
-  const nextView = event.currentTarget.dataset.view;
-  if (nextView !== "grid" && nextView !== "list") {
-    return;
-  }
-
-  state.view = nextView;
-  localStorage.setItem(VIEW_KEY, nextView);
-  setActiveViewButton();
-  applyViewClass();
-}
-
 function handleStorageSync(event) {
-  if (event.key === VIEW_KEY) {
-    state.view = loadView();
-    setActiveViewButton();
-    applyViewClass();
-    return;
-  }
-
   if (event.key !== STORAGE_KEY) {
     return;
   }
@@ -438,15 +415,9 @@ function setActiveFilterButton() {
   });
 }
 
-function setActiveViewButton() {
-  refs.viewButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.view === state.view);
-  });
-}
-
 function applyViewClass() {
-  refs.list.classList.toggle("view-grid", state.view === "grid");
-  refs.list.classList.toggle("view-list", state.view === "list");
+  refs.list.classList.remove("view-grid");
+  refs.list.classList.add("view-list");
 }
 
 function render() {
@@ -570,14 +541,6 @@ function loadItems() {
 
 function persistItems(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
-function loadView() {
-  const raw = localStorage.getItem(VIEW_KEY);
-  if (raw === "list") {
-    return "list";
-  }
-  return "grid";
 }
 
 function seedStarterItemsOnce() {

@@ -229,6 +229,14 @@ button {
 .page-link {
   text-decoration: none;
   line-height: 34px;
+  text-transform: lowercase;
+}
+
+.page-link:hover,
+.page-link:focus,
+.page-link:active,
+.page-link:visited {
+  text-decoration: none !important;
 }
 
 .page-link:focus-visible {
