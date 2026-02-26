@@ -334,6 +334,11 @@ button {
   padding: 14px;
 }
 
+.modal-backdrop[hidden],
+.confirm-backdrop[hidden] {
+  display: none !important;
+}
+
 .confirm-backdrop {
   z-index: 50;
 }
