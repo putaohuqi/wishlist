@@ -867,6 +867,39 @@ button {
   grid-column: 1 / -1;
 }
 
+.cover-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.upload-chip {
+  height: 32px;
+  padding: 0 11px;
+  font-size: 0.82rem;
+}
+
+.upload-status {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.upload-status.is-muted {
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.upload-status.is-success {
+  color: var(--text);
+  opacity: 0.88;
+}
+
+.upload-status.is-error {
+  color: var(--text);
+  opacity: 0.9;
+}
+
 .search-wrap input:focus,
 .wish-form input:focus,
 .wish-form select:focus,

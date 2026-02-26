@@ -1,5 +1,6 @@
 const STORAGE_KEY = "manhwa-items-v1";
 const COLOR_SAMPLE_SIZE = 24;
+const MAX_UPLOAD_BYTES = 1200 * 1024;
 const STATUSES = ["reading", "paused", "completed"];
 const STATUS_LABELS = {
   reading: "Reading",
@@ -23,6 +24,12 @@ const refs = {
   template: document.getElementById("manhwa-template"),
   empty: document.getElementById("empty-state"),
   search: document.getElementById("search"),
+  coverInput: document.getElementById("cover"),
+  coverDataInput: document.getElementById("cover-data"),
+  coverFileInput: document.getElementById("cover-file"),
+  coverUploadButton: document.getElementById("cover-upload-btn"),
+  coverUploadClear: document.getElementById("cover-upload-clear"),
+  coverUploadStatus: document.getElementById("cover-upload-status"),
   filters: Array.from(document.querySelectorAll("[data-filter]")),
   stats: document.getElementById("header-stats"),
   openAdd: document.getElementById("open-add"),
@@ -41,6 +48,10 @@ function initialize() {
   refs.form.addEventListener("submit", handleSubmit);
   refs.list.addEventListener("click", handleListClick);
   refs.search.addEventListener("input", handleSearch);
+  refs.coverInput.addEventListener("input", handleCoverInputChange);
+  refs.coverUploadButton.addEventListener("click", handleCoverUploadClick);
+  refs.coverFileInput.addEventListener("change", handleCoverFileChange);
+  refs.coverUploadClear.addEventListener("click", clearUploadedCover);
   refs.filters.forEach((button) => button.addEventListener("click", handleFilterChange));
   refs.openAdd.addEventListener("click", openAddModal);
   refs.closeAdd.addEventListener("click", closeModal);
@@ -59,6 +70,7 @@ function initialize() {
   }
 
   setActiveFilterButton();
+  resetCoverInputs();
   render();
 }
 
@@ -69,6 +81,7 @@ function handleSubmit(event) {
   const title = getCleanValue(formData.get("title"));
   const urlValue = getCleanValue(formData.get("url"));
   const coverValue = getCleanValue(formData.get("cover"));
+  const coverDataValue = getCleanValue(formData.get("coverData"));
   const chapter = getCleanValue(formData.get("chapter"));
   const status = normalizeStatus(formData.get("status"));
   const rating = normalizeRating(formData.get("rating"));
@@ -84,7 +97,7 @@ function handleSubmit(event) {
     return;
   }
 
-  const parsedCover = normalizeOptionalUrl(coverValue);
+  const parsedCover = normalizeCoverValue(coverDataValue || coverValue);
   if (parsedCover === null) {
     refs.form.querySelector("#cover").focus();
     return;
@@ -168,6 +181,69 @@ function handleSearch(event) {
   render();
 }
 
+function handleCoverInputChange(event) {
+  const nextValue = getCleanValue(event.target.value);
+  if (nextValue) {
+    refs.coverDataInput.value = "";
+    refs.coverFileInput.value = "";
+    refs.coverUploadClear.hidden = true;
+    setCoverUploadStatus("using cover link", "muted");
+    return;
+  }
+
+  if (!refs.coverDataInput.value) {
+    setCoverUploadStatus("or paste a cover image link above", "muted");
+  }
+}
+
+function handleCoverUploadClick() {
+  refs.coverFileInput.click();
+}
+
+async function handleCoverFileChange(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) {
+    return;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    setCoverUploadStatus("please choose an image file", "error");
+    refs.coverFileInput.value = "";
+    return;
+  }
+
+  if (file.size > MAX_UPLOAD_BYTES) {
+    setCoverUploadStatus("image is too large (max 1.2MB)", "error");
+    refs.coverFileInput.value = "";
+    return;
+  }
+
+  try {
+    const coverData = await readFileAsDataUrl(file);
+    refs.coverDataInput.value = coverData;
+    refs.coverInput.value = "";
+    refs.coverUploadClear.hidden = false;
+    setCoverUploadStatus(`uploaded: ${file.name}`, "success");
+  } catch {
+    setCoverUploadStatus("could not read this image file", "error");
+  } finally {
+    refs.coverFileInput.value = "";
+  }
+}
+
+function clearUploadedCover() {
+  refs.coverDataInput.value = "";
+  refs.coverFileInput.value = "";
+  refs.coverUploadClear.hidden = true;
+
+  if (getCleanValue(refs.coverInput.value)) {
+    setCoverUploadStatus("using cover link", "muted");
+    return;
+  }
+
+  setCoverUploadStatus("or paste a cover image link above", "muted");
+}
+
 function handleFilterChange(event) {
   const nextFilter = event.currentTarget.dataset.filter;
   if (!nextFilter) {
@@ -217,6 +293,7 @@ function handleGlobalKeydown(event) {
 function openAddModal() {
   state.editingId = null;
   refs.form.reset();
+  resetCoverInputs();
   refs.form.querySelector("#status").value = "reading";
   refs.form.querySelector("#rating").value = "";
   refs.modalTitle.textContent = "Add a manhwa";
@@ -234,7 +311,7 @@ function openEditModal(id) {
   state.editingId = id;
   refs.form.querySelector("#title").value = item.title;
   refs.form.querySelector("#url").value = item.url;
-  refs.form.querySelector("#cover").value = item.cover || "";
+  populateCoverInputs(item.cover || "");
   refs.form.querySelector("#chapter").value = item.chapter || "";
   refs.form.querySelector("#status").value = normalizeStatus(item.status);
   refs.form.querySelector("#rating").value = normalizeRating(item.rating);
@@ -303,6 +380,38 @@ function closeCardMenu(actionButton) {
   if (menu) {
     menu.open = false;
   }
+}
+
+function resetCoverInputs() {
+  refs.coverInput.value = "";
+  refs.coverDataInput.value = "";
+  refs.coverFileInput.value = "";
+  refs.coverUploadClear.hidden = true;
+  setCoverUploadStatus("or paste a cover image link above", "muted");
+}
+
+function populateCoverInputs(coverValue) {
+  resetCoverInputs();
+  const cover = getCleanValue(coverValue);
+  if (!cover) {
+    return;
+  }
+
+  if (isDataImageUrl(cover)) {
+    refs.coverDataInput.value = cover;
+    refs.coverUploadClear.hidden = false;
+    setCoverUploadStatus("using uploaded cover from device", "success");
+    return;
+  }
+
+  refs.coverInput.value = cover;
+  setCoverUploadStatus("using cover link", "muted");
+}
+
+function setCoverUploadStatus(message, stateName) {
+  refs.coverUploadStatus.textContent = message;
+  refs.coverUploadStatus.classList.remove("is-muted", "is-success", "is-error");
+  refs.coverUploadStatus.classList.add(`is-${stateName}`);
 }
 
 function setActiveFilterButton() {
@@ -465,6 +574,19 @@ function normalizeOptionalUrl(value) {
   }
 }
 
+function normalizeCoverValue(value) {
+  const clean = getCleanValue(value);
+  if (!clean) {
+    return "";
+  }
+
+  if (isDataImageUrl(clean)) {
+    return clean;
+  }
+
+  return normalizeOptionalUrl(clean);
+}
+
 function normalizeUrl(value) {
   try {
     return new URL(String(value || "").trim()).toString();
@@ -506,6 +628,10 @@ function nextStatus(currentStatus) {
 
 function getCleanValue(value) {
   return String(value || "").trim();
+}
+
+function isDataImageUrl(value) {
+  return getCleanValue(value).toLowerCase().startsWith("data:image/");
 }
 
 function createId() {
@@ -658,4 +784,13 @@ function softenAccentColor(color) {
 
 function blendChannel(source, target, amount) {
   return Math.round(source * (1 - amount) + target * amount);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("File read failed"));
+    reader.readAsDataURL(file);
+  });
 }
