@@ -58,6 +58,8 @@ const state = {
   query: "",
   editingId: null,
   pendingDeleteId: null,
+  pendingStatusId: null,
+  pendingStatusTarget: "",
   draggingId: null,
   draggingListId: null
 };
@@ -97,7 +99,14 @@ const refs = {
   saveSeriesButton: document.getElementById("save-series-btn"),
   confirmBackdrop: document.getElementById("confirm-backdrop"),
   confirmCancel: document.getElementById("confirm-cancel"),
-  confirmDelete: document.getElementById("confirm-delete")
+  confirmDelete: document.getElementById("confirm-delete"),
+  statusBackdrop: document.getElementById("status-backdrop"),
+  statusForm: document.getElementById("status-form"),
+  statusTitle: document.getElementById("status-title"),
+  statusMessage: document.getElementById("status-message"),
+  statusChapter: document.getElementById("status-chapter"),
+  statusCancel: document.getElementById("status-cancel"),
+  statusSave: document.getElementById("status-save")
 };
 
 initialize();
@@ -123,6 +132,9 @@ function initialize() {
   refs.confirmBackdrop.addEventListener("click", handleConfirmBackdropClick);
   refs.confirmCancel.addEventListener("click", closeDeleteConfirm);
   refs.confirmDelete.addEventListener("click", confirmDeleteItem);
+  refs.statusBackdrop.addEventListener("click", handleStatusBackdropClick);
+  refs.statusCancel.addEventListener("click", closeStatusPrompt);
+  refs.statusForm.addEventListener("submit", handleStatusFormSubmit);
   window.addEventListener("storage", handleStorageSync);
   window.addEventListener("pageshow", resetOverlayState);
   document.addEventListener("keydown", handleGlobalKeydown);
@@ -295,19 +307,7 @@ function handleListClick(event) {
   }
 
   if (action === "cycle-status") {
-    const now = Date.now();
-    state.items = state.items.map((item) => {
-      if (item.id !== id) {
-        return item;
-      }
-      return {
-        ...item,
-        status: nextStatus(item.status),
-        _updatedAt: now
-      };
-    });
-    persistItems(state.items);
-    render();
+    openStatusPrompt(id);
   }
 }
 
@@ -517,8 +517,55 @@ function handleConfirmBackdropClick(event) {
   }
 }
 
+function handleStatusBackdropClick(event) {
+  if (event.target === refs.statusBackdrop) {
+    closeStatusPrompt();
+  }
+}
+
+function handleStatusFormSubmit(event) {
+  event.preventDefault();
+
+  if (!state.pendingStatusId || !state.pendingStatusTarget) {
+    closeStatusPrompt();
+    return;
+  }
+
+  const item = state.items.find((entry) => entry.id === state.pendingStatusId);
+  if (!item) {
+    closeStatusPrompt();
+    return;
+  }
+
+  const chapterInput = getCleanValue(refs.statusChapter.value);
+  const chapter = chapterInput || item.chapter || "";
+  const now = Date.now();
+
+  state.items = state.items.map((entry) => {
+    if (entry.id !== state.pendingStatusId) {
+      return entry;
+    }
+
+    return {
+      ...entry,
+      status: normalizeStatus(state.pendingStatusTarget),
+      chapter,
+      _updatedAt: now
+    };
+  });
+
+  persistItems(state.items);
+  render();
+  closeStatusPrompt();
+}
+
 function handleGlobalKeydown(event) {
   if (event.key !== "Escape") {
+    return;
+  }
+
+  if (!refs.statusBackdrop.hidden) {
+    closeStatusPrompt();
     return;
   }
 
@@ -569,7 +616,10 @@ function openEditModal(id) {
 
 function openModal() {
   refs.confirmBackdrop.hidden = true;
+  refs.statusBackdrop.hidden = true;
   state.pendingDeleteId = null;
+  state.pendingStatusId = null;
+  state.pendingStatusTarget = "";
   refs.modalBackdrop.hidden = false;
   syncBodyModalState();
 }
@@ -582,7 +632,10 @@ function closeModal() {
 
 function openDeleteConfirm(id) {
   refs.modalBackdrop.hidden = true;
+  refs.statusBackdrop.hidden = true;
   state.editingId = null;
+  state.pendingStatusId = null;
+  state.pendingStatusTarget = "";
   state.pendingDeleteId = id;
   refs.confirmBackdrop.hidden = false;
   syncBodyModalState();
@@ -591,6 +644,43 @@ function openDeleteConfirm(id) {
 function closeDeleteConfirm() {
   refs.confirmBackdrop.hidden = true;
   state.pendingDeleteId = null;
+  syncBodyModalState();
+}
+
+function openStatusPrompt(id) {
+  const item = state.items.find((entry) => entry.id === id);
+  if (!item) {
+    return;
+  }
+
+  const targetStatus = getQuickStatusTarget(item.status);
+  if (!targetStatus) {
+    return;
+  }
+
+  state.pendingStatusId = id;
+  state.pendingStatusTarget = targetStatus;
+  state.editingId = null;
+  state.pendingDeleteId = null;
+
+  refs.modalBackdrop.hidden = true;
+  refs.confirmBackdrop.hidden = true;
+  refs.statusBackdrop.hidden = false;
+
+  refs.statusTitle.textContent = getStatusActionLabel(item.status);
+  refs.statusMessage.textContent = "Add your latest chapter before updating status.";
+  refs.statusSave.textContent = getStatusActionLabel(item.status);
+  refs.statusChapter.value = item.chapter || "";
+  syncBodyModalState();
+  refs.statusChapter.focus();
+  refs.statusChapter.select();
+}
+
+function closeStatusPrompt() {
+  refs.statusBackdrop.hidden = true;
+  state.pendingStatusId = null;
+  state.pendingStatusTarget = "";
+  refs.statusChapter.value = "";
   syncBodyModalState();
 }
 
@@ -611,6 +701,7 @@ function syncBodyModalState() {
   const anyOpen =
     !refs.modalBackdrop.hidden ||
     !refs.confirmBackdrop.hidden ||
+    !refs.statusBackdrop.hidden ||
     Boolean(authBackdrop && !authBackdrop.hidden);
   document.body.classList.toggle("modal-open", anyOpen);
 }
@@ -618,8 +709,11 @@ function syncBodyModalState() {
 function resetOverlayState() {
   refs.modalBackdrop.hidden = true;
   refs.confirmBackdrop.hidden = true;
+  refs.statusBackdrop.hidden = true;
   state.editingId = null;
   state.pendingDeleteId = null;
+  state.pendingStatusId = null;
+  state.pendingStatusTarget = "";
   syncBodyModalState();
 }
 
@@ -786,7 +880,7 @@ function createSeriesCard(item, canDrag) {
   }
 
   const cycleButton = card.querySelector("[data-action='cycle-status']");
-  cycleButton.textContent = `Set ${STATUS_LABELS[nextStatus(item.status)].toLowerCase()}`;
+  cycleButton.textContent = getStatusActionLabel(item.status);
 
   return card;
 }
@@ -1084,9 +1178,30 @@ function cleanupDragState() {
   clearDropTargets();
 }
 
-function nextStatus(currentStatus) {
-  const currentIndex = STATUSES.indexOf(normalizeStatus(currentStatus));
-  return STATUSES[(currentIndex + 1) % STATUSES.length];
+function getQuickStatusTarget(currentStatus) {
+  const status = normalizeStatus(currentStatus);
+  if (status === "want-to-read") {
+    return "reading";
+  }
+
+  if (status === "reading") {
+    return "completed";
+  }
+
+  if (status === "completed") {
+    return "reading";
+  }
+
+  return "reading";
+}
+
+function getStatusActionLabel(currentStatus) {
+  const targetStatus = getQuickStatusTarget(currentStatus);
+  if (targetStatus === "completed") {
+    return "Set to complete";
+  }
+
+  return `Set to ${STATUS_LABELS[targetStatus].toLowerCase()}`;
 }
 
 function getCleanValue(value) {

@@ -145,7 +145,7 @@
                 <summary class="menu-trigger" aria-label="More options">⋯</summary>
                 <div class="menu-panel">
                   <button type="button" data-action="edit-item">Edit</button>
-                  <button type="button" data-action="cycle-status">Next status</button>
+                  <button type="button" data-action="cycle-status">Set status</button>
                   <button type="button" data-action="delete">Delete</button>
                 </div>
               </details>
@@ -285,6 +285,21 @@
           <button id="confirm-cancel" type="button" class="close-btn">Cancel</button>
           <button id="confirm-delete" type="button" class="confirm-btn">Delete</button>
         </div>
+      </section>
+    </div>
+
+    <div id="status-backdrop" class="confirm-backdrop" hidden>
+      <section class="confirm-card status-card" role="dialog" aria-modal="true" aria-labelledby="status-title">
+        <h2 id="status-title">Set to reading</h2>
+        <p id="status-message">Add your latest chapter before updating status.</p>
+        <form id="status-form" class="status-form">
+          <label for="status-chapter">chapter #</label>
+          <input id="status-chapter" name="chapter" type="text" placeholder="e.g. 128" />
+          <div class="confirm-actions">
+            <button id="status-cancel" type="button" class="close-btn">Cancel</button>
+            <button id="status-save" type="submit" class="confirm-btn">Set to reading</button>
+          </div>
+        </form>
       </section>
     </div>
   </body>
