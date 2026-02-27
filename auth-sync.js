@@ -8,6 +8,7 @@
   const refs = {
     openAuth: document.getElementById("open-auth"),
     closeAuth: document.getElementById("close-auth"),
+    syncNow: document.getElementById("auth-sync-now"),
     signOut: document.getElementById("auth-signout"),
     status: document.getElementById("auth-status"),
     backdrop: document.getElementById("auth-backdrop"),
@@ -22,6 +23,7 @@
 
   const saveQueues = new Map();
   const authListeners = new Set();
+  const syncListeners = new Set();
 
   let authMode = "signin";
   let firebaseReady = false;
@@ -52,6 +54,7 @@
       auth = window.firebase.auth();
       db = window.firebase.firestore();
       firebaseReady = true;
+      setSessionPersistence();
 
       auth.onAuthStateChanged((user) => {
         currentUser = user || null;
@@ -109,6 +112,8 @@
       }
     });
 
+    refs.syncNow?.addEventListener("click", handleSyncNowClick);
+
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && refs.backdrop && !refs.backdrop.hidden) {
         closeAuthModal();
@@ -155,6 +160,32 @@
       setFeedback(readableAuthError(error), "error");
     } finally {
       setAuthLoading(false);
+    }
+  }
+
+  async function handleSyncNowClick() {
+    if (!firebaseReady || !currentUser) {
+      openAuthModal();
+      return;
+    }
+
+    if (refs.syncNow) {
+      refs.syncNow.disabled = true;
+    }
+
+    setFeedback("syncing now...", "muted");
+
+    try {
+      await requestSync();
+      setFeedback("synced now", "success");
+      setSignedInUi(currentUser.email || "signed in");
+    } catch (error) {
+      console.error("Manual sync failed:", error);
+      reportSyncError(error);
+    } finally {
+      if (refs.syncNow) {
+        refs.syncNow.disabled = false;
+      }
     }
   }
 
@@ -223,6 +254,10 @@
       refs.openAuth.hidden = false;
     }
 
+    if (refs.syncNow) {
+      refs.syncNow.hidden = false;
+    }
+
     if (refs.signOut) {
       refs.signOut.hidden = false;
     }
@@ -236,6 +271,11 @@
     if (refs.openAuth) {
       refs.openAuth.textContent = firebaseReady ? "sign in" : "setup";
       refs.openAuth.hidden = false;
+    }
+
+    if (refs.syncNow) {
+      refs.syncNow.hidden = true;
+      refs.syncNow.disabled = false;
     }
 
     if (refs.signOut) {
@@ -329,6 +369,37 @@
     return () => {
       authListeners.delete(listener);
     };
+  }
+
+  function onSyncRequest(listener) {
+    if (typeof listener !== "function") {
+      return () => {};
+    }
+
+    syncListeners.add(listener);
+
+    return () => {
+      syncListeners.delete(listener);
+    };
+  }
+
+  async function requestSync() {
+    if (!firebaseReady || !currentUser) {
+      const unauthenticated = new Error("Not signed in");
+      unauthenticated.code = "unauthenticated";
+      throw unauthenticated;
+    }
+
+    const listeners = Array.from(syncListeners);
+    if (!listeners.length) {
+      return;
+    }
+
+    const results = await Promise.allSettled(listeners.map((listener) => Promise.resolve().then(() => listener())));
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed && failed.status === "rejected") {
+      throw failed.reason;
+    }
   }
 
   function getListRef(listId) {
@@ -629,10 +700,22 @@
       isReady: () => firebaseReady,
       getCurrentUser: () => currentUser,
       onAuthChange,
+      onSyncRequest,
+      requestSync,
       syncList,
       saveList,
       noteLocalChange
     };
+  }
+
+  function setSessionPersistence() {
+    if (!auth || !window.firebase?.auth?.Auth?.Persistence?.LOCAL) {
+      return;
+    }
+
+    auth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL).catch((error) => {
+      console.error("Could not set auth persistence:", error);
+    });
   }
 
   function reportSyncError(error) {

@@ -87,7 +87,7 @@ function initializeCloudSync() {
 
   let syncTimerId = 0;
 
-  const runSync = async () => {
+  const runSync = async ({ throwOnError = false } = {}) => {
     if (!cloud.getCurrentUser()) {
       return;
     }
@@ -104,8 +104,15 @@ function initializeCloudSync() {
       render();
     } catch (error) {
       console.error("Cloud sync failed for wishlist:", error);
+      if (throwOnError) {
+        throw error;
+      }
     }
   };
+
+  if (typeof cloud.onSyncRequest === "function") {
+    cloud.onSyncRequest(() => runSync({ throwOnError: true }));
+  }
 
   cloud.onAuthChange(async (user) => {
     if (syncTimerId) {
