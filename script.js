@@ -165,7 +165,7 @@ function handleSubmit(event) {
     purchaseStatus,
     owned: purchaseStatus !== "not-bought",
     trackingNumber:
-      purchaseStatus === "on-the-way" ? getCleanValue(formData.get("trackingNumber")) : "",
+      purchaseStatus === "on-the-way" ? normalizeTrackingNumber(formData.get("trackingNumber")) : "",
     price: getCleanValue(formData.get("price")),
     size: getCleanValue(formData.get("size")),
     color: getCleanValue(formData.get("color")),
@@ -215,6 +215,20 @@ function handleListClick(event) {
   const id = card.dataset.id;
   const action = actionButton.dataset.action;
   closeCardMenu(actionButton);
+
+  if (action === "track-package") {
+    const item = state.items.find((entry) => entry.id === id);
+    if (!item) {
+      return;
+    }
+    const trackingNumber = normalizeTrackingNumber(item.trackingNumber);
+    if (!trackingNumber) {
+      return;
+    }
+    const trackingUrl = buildCanadaPostTrackingUrl(trackingNumber);
+    window.open(trackingUrl, "_blank", "noopener,noreferrer");
+    return;
+  }
 
   if (action === "edit-item") {
     openEditModal(id);
@@ -537,10 +551,11 @@ function render() {
     titleLink.textContent = item.title;
     titleLink.href = item.url;
     const purchaseStatus = normalizePurchaseStatus(item.purchaseStatus, item.owned, item.trackingNumber);
+    const trackingNumber = normalizeTrackingNumber(item.trackingNumber);
     const metaText = buildMetaLine(item);
     card.querySelector(".wish-meta-text").textContent =
-      purchaseStatus === "on-the-way" && item.trackingNumber
-        ? `${metaText} · Tracking ${item.trackingNumber}`
+      purchaseStatus === "on-the-way" && trackingNumber
+        ? `${metaText} · Tracking ${trackingNumber}`
         : metaText;
 
     const statusBadge = card.querySelector(".wish-status");
@@ -560,6 +575,10 @@ function render() {
 
     const toggleOnWay = card.querySelector("[data-action='toggle-on-way']");
     toggleOnWay.textContent = purchaseStatus === "on-the-way" ? "Mark delivered" : "Mark on the way";
+
+    const trackPackage = card.querySelector("[data-action='track-package']");
+    const canTrack = purchaseStatus === "on-the-way" && Boolean(trackingNumber);
+    trackPackage.hidden = !canTrack;
 
     refs.list.append(card);
   });
@@ -632,7 +651,7 @@ function loadItems() {
     return parsed
       .filter((item) => item && typeof item === "object")
       .map((item, index) => {
-        const trackingNumber = String(item.trackingNumber || "");
+        const trackingNumber = normalizeTrackingNumber(item.trackingNumber);
         const purchaseStatus = normalizePurchaseStatus(item.purchaseStatus, Boolean(item.owned), trackingNumber);
         return {
           id: String(item.id || createId()),
@@ -695,6 +714,14 @@ function normalizePurchaseStatus(value, ownedFallback = false, trackingFallback 
   }
 
   return "not-bought";
+}
+
+function normalizeTrackingNumber(value) {
+  return getCleanValue(value).replace(/\s+/g, "");
+}
+
+function buildCanadaPostTrackingUrl(trackingNumber) {
+  return `https://www.canadapost-postescanada.ca/track-reperage/en#/search?searchFor=${encodeURIComponent(trackingNumber)}&searchBy=pin`;
 }
 
 function normalizeOrder(value, fallback) {
