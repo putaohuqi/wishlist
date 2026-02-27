@@ -49,7 +49,7 @@
         <div class="tool-row">
           <label class="search-wrap" for="search">
             <span class="sr-only">Search tracker</span>
-            <input id="search" type="search" placeholder="Search title, chapter, rating, or note" />
+            <input id="search" type="search" placeholder="Search title, chapter, or note" />
           </label>
 
           <div class="filters" aria-label="Manhwa filters">
@@ -199,7 +199,7 @@
 
         <form id="manhwa-form" class="wish-form">
           <label for="title">Title *</label>
-          <input id="title" name="title" type="text" placeholder="Omniscient Reader's Viewpoint" required />
+          <input id="title" name="title" type="text" placeholder="Enter title" required />
 
           <label for="url">Link *</label>
           <input id="url" name="url" type="url" placeholder="https://..." required />
@@ -218,7 +218,8 @@
             <div class="field">
               <label for="series-type">Type</label>
               <select id="series-type" name="seriesType">
-                <option value="manhwa" selected>manhwa</option>
+                <option value="" selected>select</option>
+                <option value="manhwa">manhwa</option>
                 <option value="manga">manga</option>
                 <option value="manhua">manhua</option>
               </select>
@@ -227,8 +228,9 @@
             <div class="field">
               <label for="series-genre">Genre</label>
               <select id="series-genre" name="genre">
+                <option value="" selected>select</option>
                 <option value="bl">BL</option>
-                <option value="romance-fantasy" selected>romance fantasy</option>
+                <option value="romance-fantasy">romance fantasy</option>
                 <option value="action">action</option>
                 <option value="romance">romance</option>
                 <option value="drama">drama</option>
@@ -243,7 +245,7 @@
 
             <div class="field">
               <label for="chapter">Current chapter</label>
-              <input id="chapter" name="chapter" type="text" placeholder="145" />
+              <input id="chapter" name="chapter" type="text" placeholder="Enter chapter" />
             </div>
 
             <div class="field">
@@ -252,23 +254,6 @@
                 <option value="reading" selected>Reading</option>
                 <option value="want-to-read">Want to read</option>
                 <option value="completed">Completed</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label for="rating">Rating</label>
-              <select id="rating" name="rating">
-                <option value="">No rating</option>
-                <option value="10">10</option>
-                <option value="9">9</option>
-                <option value="8">8</option>
-                <option value="7">7</option>
-                <option value="6">6</option>
-                <option value="5">5</option>
-                <option value="4">4</option>
-                <option value="3">3</option>
-                <option value="2">2</option>
-                <option value="1">1</option>
               </select>
             </div>
 

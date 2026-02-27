@@ -205,7 +205,6 @@ function handleSubmit(event) {
   const genre = normalizeGenre(formData.get("genre"));
   const chapter = getCleanValue(formData.get("chapter"));
   const status = normalizeStatus(formData.get("status"));
-  const rating = normalizeRating(formData.get("rating"));
   const note = getCleanValue(formData.get("note"));
 
   if (!title || !urlValue) {
@@ -232,7 +231,6 @@ function handleSubmit(event) {
     genre,
     chapter,
     status,
-    rating,
     note,
     _updatedAt: Date.now()
   };
@@ -531,10 +529,9 @@ function openAddModal() {
   state.editingId = null;
   refs.form.reset();
   resetCoverInputs();
-  refs.form.querySelector("#series-type").value = "manhwa";
-  refs.form.querySelector("#series-genre").value = "romance-fantasy";
+  refs.form.querySelector("#series-type").value = "";
+  refs.form.querySelector("#series-genre").value = "";
   refs.form.querySelector("#status").value = "reading";
-  refs.form.querySelector("#rating").value = "";
   refs.modalTitle.textContent = "Add a read";
   refs.saveSeriesButton.textContent = "Save to tracker";
   openModal();
@@ -555,7 +552,6 @@ function openEditModal(id) {
   refs.form.querySelector("#series-genre").value = normalizeGenre(item.genre);
   refs.form.querySelector("#chapter").value = item.chapter || "";
   refs.form.querySelector("#status").value = normalizeStatus(item.status);
-  refs.form.querySelector("#rating").value = normalizeRating(item.rating);
   refs.form.querySelector("#note").value = item.note || "";
 
   refs.modalTitle.textContent = "Edit series";
@@ -793,12 +789,15 @@ function buildMetaLine(item) {
   if (item.chapter) {
     parts.push(`Ch. ${item.chapter}`);
   }
-  parts.push(TYPE_LABELS[normalizeSeriesType(item.seriesType)]);
-  parts.push(GENRE_LABELS[normalizeGenre(item.genre)]);
-  parts.push(STATUS_LABELS[normalizeStatus(item.status)]);
-  if (item.rating) {
-    parts.push(`${item.rating}/10`);
+  const type = normalizeSeriesType(item.seriesType);
+  const genre = normalizeGenre(item.genre);
+  if (type && TYPE_LABELS[type]) {
+    parts.push(TYPE_LABELS[type]);
   }
+  if (genre && GENRE_LABELS[genre]) {
+    parts.push(GENRE_LABELS[genre]);
+  }
+  parts.push(STATUS_LABELS[normalizeStatus(item.status)]);
   return parts.join(" · ");
 }
 
@@ -834,7 +833,7 @@ function getVisibleItems(items, filter, typeFilter, genreFilter, query) {
         return true;
       }
       const haystack =
-        `${item.title} ${item.chapter} ${item.status} ${item.rating} ${item.note} ${item.seriesType} ${item.genre}`.toLowerCase();
+        `${item.title} ${item.chapter} ${item.status} ${item.note} ${item.seriesType} ${item.genre}`.toLowerCase();
       return haystack.includes(query);
     });
 }
@@ -865,7 +864,6 @@ function loadItems() {
         genre: normalizeGenre(item.genre),
         chapter: String(item.chapter || ""),
         status: normalizeStatus(item.status),
-        rating: normalizeRating(item.rating),
         note: String(item.note || "")
       }));
   } catch {
@@ -962,7 +960,7 @@ function normalizeSeriesType(value) {
   if (SERIES_TYPES.includes(clean)) {
     return clean;
   }
-  return "manhwa";
+  return "";
 }
 
 function normalizeGenre(value) {
@@ -971,25 +969,7 @@ function normalizeGenre(value) {
   if (SERIES_GENRES.includes(mapped)) {
     return mapped;
   }
-  return "romance-fantasy";
-}
-
-function normalizeRating(value) {
-  const clean = getCleanValue(value);
-  if (!clean) {
-    return "";
-  }
-
-  const numeric = Number(clean);
-  if (!Number.isFinite(numeric)) {
-    return "";
-  }
-
-  const rounded = Math.round(numeric);
-  if (rounded < 1 || rounded > 10) {
-    return "";
-  }
-  return String(rounded);
+  return "";
 }
 
 function getLatestUpdate(items) {
