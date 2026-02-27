@@ -49,7 +49,7 @@
         <div class="tool-row">
           <label class="search-wrap" for="search">
             <span class="sr-only">Search wishlist</span>
-            <input id="search" type="search" placeholder="Search item, color, size, or note" />
+            <input id="search" type="search" placeholder="Search item, color, size, note, or tracking" />
           </label>
 
           <div class="filters" aria-label="Wishlist filters">
@@ -73,6 +73,7 @@
                 <summary class="menu-trigger" aria-label="More options">⋯</summary>
                 <div class="menu-panel">
                   <button type="button" data-action="edit-item">Edit</button>
+                  <button type="button" data-action="toggle-on-way">Mark on the way</button>
                   <button type="button" data-action="toggle-owned">Mark bought</button>
                   <button type="button" data-action="delete">Delete</button>
                 </div>
@@ -87,6 +88,7 @@
               <a class="wish-title-link" target="_blank" rel="noopener noreferrer" draggable="false"></a>
             </h3>
             <p class="wish-meta-line">
+              <span class="wish-status" hidden></span>
               <span class="wish-meta-text"></span>
             </p>
           </li>
@@ -168,6 +170,15 @@
               </div>
 
               <div class="field">
+                <label for="purchase-status">Purchase</label>
+                <select id="purchase-status" name="purchaseStatus">
+                  <option value="not-bought" selected>Not bought</option>
+                  <option value="on-the-way">On the way</option>
+                  <option value="bought">Bought</option>
+                </select>
+              </div>
+
+              <div class="field">
                 <label for="price">Price</label>
                 <input id="price" name="price" type="text" placeholder="$39" />
               </div>
@@ -175,6 +186,11 @@
               <div class="field">
                 <label for="size">Size</label>
                 <input id="size" name="size" type="text" placeholder="XS, S, M" />
+              </div>
+
+              <div class="field field-full">
+                <label for="tracking-number">Tracking number</label>
+                <input id="tracking-number" name="trackingNumber" type="text" placeholder="1Z999..." />
               </div>
 
               <div class="field field-full">

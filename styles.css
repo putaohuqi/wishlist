@@ -481,7 +481,7 @@ button {
   position: absolute;
   right: 0;
   top: 36px;
-  min-width: 132px;
+  min-width: 150px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--card);
@@ -552,6 +552,32 @@ button {
   color: var(--muted);
   font-size: 0.86rem;
   opacity: 0.92;
+}
+
+.wish-status {
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.wish-status.is-on-way {
+  border-color: var(--chip-active-border);
+  background: var(--chip-active-bg);
+  color: var(--text);
+}
+
+.wish-status.is-bought {
+  border-color: var(--blue-4);
+  background: color-mix(in srgb, var(--card) 70%, var(--blue-5));
+  color: var(--text);
 }
 
 .wishlist.view-grid .wish-card {
@@ -678,6 +704,10 @@ button {
 
 .wishlist.view-list .wish-meta-line {
   grid-area: meta;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   font-size: 0.82rem;
   line-height: 1.2;
   margin: 0;

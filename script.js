@@ -1,6 +1,12 @@
 const STORAGE_KEY = "wishlist-items-v1";
 const CLOUD_LIST_ID = "wishlist";
 const COLOR_SAMPLE_SIZE = 24;
+const PURCHASE_STATUSES = ["not-bought", "on-the-way", "bought"];
+const PURCHASE_STATUS_LABELS = {
+  "not-bought": "Not bought",
+  "on-the-way": "On the way",
+  bought: "Bought"
+};
 
 const accentCache = new Map();
 
@@ -16,6 +22,8 @@ const state = {
 
 const refs = {
   form: document.getElementById("wish-form"),
+  purchaseStatus: document.getElementById("purchase-status"),
+  trackingNumber: document.getElementById("tracking-number"),
   list: document.getElementById("wishlist"),
   template: document.getElementById("wish-template"),
   empty: document.getElementById("empty-state"),
@@ -36,6 +44,7 @@ initialize();
 
 function initialize() {
   refs.form.addEventListener("submit", handleSubmit);
+  refs.purchaseStatus.addEventListener("change", handlePurchaseStatusChange);
   refs.list.addEventListener("click", handleListClick);
   refs.list.addEventListener("dragstart", handleCardDragStart);
   refs.list.addEventListener("dragover", handleCardDragOver);
@@ -63,6 +72,7 @@ function initialize() {
   initializeCloudSync();
 
   setActiveFilterButton();
+  syncTrackingFieldState();
   applyViewClass();
   render();
 }
@@ -128,6 +138,7 @@ function handleSubmit(event) {
   const category = getCleanValue(formData.get("category"));
   const imageValue = getCleanValue(formData.get("image"));
   const priority = normalizePriority(formData.get("priority"));
+  const purchaseStatus = normalizePurchaseStatus(formData.get("purchaseStatus"));
 
   if (!title || !urlValue || !category) {
     return;
@@ -151,6 +162,10 @@ function handleSubmit(event) {
     image: parsedImage,
     category,
     priority,
+    purchaseStatus,
+    owned: purchaseStatus !== "not-bought",
+    trackingNumber:
+      purchaseStatus === "on-the-way" ? getCleanValue(formData.get("trackingNumber")) : "",
     price: getCleanValue(formData.get("price")),
     size: getCleanValue(formData.get("size")),
     color: getCleanValue(formData.get("color")),
@@ -173,7 +188,7 @@ function handleSubmit(event) {
     const now = Date.now();
     state.items.unshift({
       id: createId(),
-      owned: false,
+      owned: purchaseStatus !== "not-bought",
       order: frontOrder,
       createdAt: now,
       _updatedAt: now,
@@ -215,7 +230,23 @@ function handleListClick(event) {
       if (item.id !== id) {
         return item;
       }
-      return { ...item, owned: !item.owned, _updatedAt: now };
+      const currentStatus = normalizePurchaseStatus(item.purchaseStatus, item.owned, item.trackingNumber);
+      if (currentStatus === "not-bought") {
+        return { ...item, purchaseStatus: "bought", owned: true, trackingNumber: "", _updatedAt: now };
+      }
+      return { ...item, purchaseStatus: "not-bought", owned: false, trackingNumber: "", _updatedAt: now };
+    });
+  } else if (action === "toggle-on-way") {
+    const now = Date.now();
+    state.items = state.items.map((item) => {
+      if (item.id !== id) {
+        return item;
+      }
+      const currentStatus = normalizePurchaseStatus(item.purchaseStatus, item.owned, item.trackingNumber);
+      if (currentStatus === "on-the-way") {
+        return { ...item, purchaseStatus: "bought", owned: true, _updatedAt: now };
+      }
+      return { ...item, purchaseStatus: "on-the-way", owned: true, _updatedAt: now };
     });
   } else {
     return;
@@ -228,6 +259,10 @@ function handleListClick(event) {
 function handleSearch(event) {
   state.query = getCleanValue(event.target.value).toLowerCase();
   render();
+}
+
+function handlePurchaseStatusChange() {
+  syncTrackingFieldState();
 }
 
 function handleCardDragStart(event) {
@@ -340,6 +375,9 @@ function openAddModal() {
   refs.form.reset();
   refs.form.querySelector("#category").value = "Fashion";
   refs.form.querySelector("#priority").value = "medium";
+  refs.form.querySelector("#purchase-status").value = "not-bought";
+  refs.form.querySelector("#tracking-number").value = "";
+  syncTrackingFieldState();
   refs.modalTitle.textContent = "Add a wish";
   refs.saveWishButton.textContent = "Add to wishlist";
   openModal();
@@ -359,6 +397,13 @@ function openEditModal(id) {
   refs.form.querySelector("#category").value = item.category || "Other";
   refs.form.querySelector("#image").value = item.image || "";
   refs.form.querySelector("#priority").value = normalizePriority(item.priority);
+  refs.form.querySelector("#purchase-status").value = normalizePurchaseStatus(
+    item.purchaseStatus,
+    item.owned,
+    item.trackingNumber
+  );
+  refs.form.querySelector("#tracking-number").value = item.trackingNumber || "";
+  syncTrackingFieldState();
   refs.form.querySelector("#price").value = item.price || "";
   refs.form.querySelector("#size").value = item.size || "";
   refs.form.querySelector("#color").value = item.color || "";
@@ -380,6 +425,8 @@ function openModal() {
 function closeModal() {
   refs.modalBackdrop.hidden = true;
   state.editingId = null;
+  refs.form.reset();
+  syncTrackingFieldState();
   syncBodyModalState();
 }
 
@@ -395,6 +442,18 @@ function closeDeleteConfirm() {
   refs.confirmBackdrop.hidden = true;
   state.pendingDeleteId = null;
   syncBodyModalState();
+}
+
+function syncTrackingFieldState() {
+  const status = normalizePurchaseStatus(refs.purchaseStatus.value);
+  const shouldEnableTracking = status === "on-the-way";
+  refs.trackingNumber.disabled = !shouldEnableTracking;
+  if (!shouldEnableTracking) {
+    refs.trackingNumber.value = "";
+    refs.trackingNumber.placeholder = "Only needed when item is on the way";
+  } else {
+    refs.trackingNumber.placeholder = "1Z999...";
+  }
 }
 
 function confirmDeleteItem() {
@@ -477,11 +536,30 @@ function render() {
 
     titleLink.textContent = item.title;
     titleLink.href = item.url;
+    const purchaseStatus = normalizePurchaseStatus(item.purchaseStatus, item.owned, item.trackingNumber);
+    const metaText = buildMetaLine(item);
+    card.querySelector(".wish-meta-text").textContent =
+      purchaseStatus === "on-the-way" && item.trackingNumber
+        ? `${metaText} · Tracking ${item.trackingNumber}`
+        : metaText;
 
-    card.querySelector(".wish-meta-text").textContent = buildMetaLine(item);
+    const statusBadge = card.querySelector(".wish-status");
+    if (purchaseStatus === "not-bought") {
+      statusBadge.hidden = true;
+      statusBadge.textContent = "";
+      statusBadge.classList.remove("is-on-way", "is-bought");
+    } else {
+      statusBadge.hidden = false;
+      statusBadge.textContent = PURCHASE_STATUS_LABELS[purchaseStatus];
+      statusBadge.classList.toggle("is-on-way", purchaseStatus === "on-the-way");
+      statusBadge.classList.toggle("is-bought", purchaseStatus === "bought");
+    }
 
     const toggleOwned = card.querySelector("[data-action='toggle-owned']");
-    toggleOwned.textContent = item.owned ? "Mark not bought" : "Mark bought";
+    toggleOwned.textContent = purchaseStatus === "not-bought" ? "Mark bought" : "Mark not bought";
+
+    const toggleOnWay = card.querySelector("[data-action='toggle-on-way']");
+    toggleOnWay.textContent = purchaseStatus === "on-the-way" ? "Mark delivered" : "Mark on the way";
 
     refs.list.append(card);
   });
@@ -509,7 +587,9 @@ function buildMetaLine(item) {
 
 function renderStats(items) {
   const total = items.length;
-  const open = items.filter((item) => !item.owned).length;
+  const open = items.filter(
+    (item) => normalizePurchaseStatus(item.purchaseStatus, item.owned, item.trackingNumber) === "not-bought"
+  ).length;
 
   refs.stats.textContent = `${total} items • ${open} not bought`;
 }
@@ -517,11 +597,12 @@ function renderStats(items) {
 function getVisibleItems(items, filter, query) {
   return getOrderedItems(items)
     .filter((item) => {
+      const purchaseStatus = normalizePurchaseStatus(item.purchaseStatus, item.owned, item.trackingNumber);
       if (filter === "open") {
-        return !item.owned;
+        return purchaseStatus === "not-bought";
       }
       if (filter === "owned") {
-        return item.owned;
+        return purchaseStatus !== "not-bought";
       }
       return true;
     })
@@ -530,7 +611,8 @@ function getVisibleItems(items, filter, query) {
         return true;
       }
 
-      const haystack = `${item.title} ${item.category} ${item.price} ${item.priority} ${item.size} ${item.color} ${item.note}`.toLowerCase();
+      const haystack =
+        `${item.title} ${item.category} ${item.price} ${item.priority} ${item.size} ${item.color} ${item.note} ${item.trackingNumber} ${item.purchaseStatus}`.toLowerCase();
       return haystack.includes(query);
     });
 }
@@ -549,22 +631,28 @@ function loadItems() {
 
     return parsed
       .filter((item) => item && typeof item === "object")
-      .map((item, index) => ({
-        id: String(item.id || createId()),
-        createdAt: normalizeTimestamp(item.createdAt, Date.now()),
-        _updatedAt: normalizeTimestamp(item._updatedAt || item.updatedAt || item.createdAt, Date.now()),
-        title: String(item.title || "Untitled item"),
-        url: String(item.url || "#"),
-        image: String(item.image || ""),
-        category: String(item.category || "Other"),
-        priority: normalizePriority(item.priority),
-        order: normalizeOrder(item.order, index),
-        price: String(item.price || ""),
-        size: String(item.size || ""),
-        color: String(item.color || ""),
-        note: String(item.note || ""),
-        owned: Boolean(item.owned)
-      }));
+      .map((item, index) => {
+        const trackingNumber = String(item.trackingNumber || "");
+        const purchaseStatus = normalizePurchaseStatus(item.purchaseStatus, Boolean(item.owned), trackingNumber);
+        return {
+          id: String(item.id || createId()),
+          createdAt: normalizeTimestamp(item.createdAt, Date.now()),
+          _updatedAt: normalizeTimestamp(item._updatedAt || item.updatedAt || item.createdAt, Date.now()),
+          title: String(item.title || "Untitled item"),
+          url: String(item.url || "#"),
+          image: String(item.image || ""),
+          category: String(item.category || "Other"),
+          priority: normalizePriority(item.priority),
+          purchaseStatus,
+          trackingNumber: purchaseStatus === "on-the-way" ? trackingNumber : "",
+          order: normalizeOrder(item.order, index),
+          price: String(item.price || ""),
+          size: String(item.size || ""),
+          color: String(item.color || ""),
+          note: String(item.note || ""),
+          owned: purchaseStatus !== "not-bought"
+        };
+      });
   } catch {
     return [];
   }
@@ -589,6 +677,24 @@ function normalizePriority(value) {
     return clean;
   }
   return "medium";
+}
+
+function normalizePurchaseStatus(value, ownedFallback = false, trackingFallback = "") {
+  const clean = getCleanValue(value).toLowerCase();
+  if (PURCHASE_STATUSES.includes(clean)) {
+    return clean;
+  }
+
+  const hasTracking = Boolean(getCleanValue(trackingFallback));
+  if (ownedFallback && hasTracking) {
+    return "on-the-way";
+  }
+
+  if (ownedFallback) {
+    return "bought";
+  }
+
+  return "not-bought";
 }
 
 function normalizeOrder(value, fallback) {
