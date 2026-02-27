@@ -706,7 +706,7 @@ function render() {
     return;
   }
 
-  const showOngoing = state.filter === "all" || state.filter === "reading" || state.filter === "paused";
+  const showOngoing = state.filter === "all" || state.filter === "reading";
   const showWant = state.filter === "all" || state.filter === "want-to-read";
   const showCompleted = state.filter === "all" || state.filter === "completed";
 
