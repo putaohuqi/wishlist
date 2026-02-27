@@ -2,7 +2,7 @@ const STORAGE_KEY = "manhwa-items-v1";
 const CLOUD_LIST_ID = "manhwa";
 const COLOR_SAMPLE_SIZE = 24;
 const MAX_UPLOAD_BYTES = 1200 * 1024;
-const STATUSES = ["reading", "paused", "want-to-read", "completed"];
+const STATUSES = ["reading", "want-to-read", "completed"];
 const SERIES_TYPES = ["manhwa", "manga", "manhua"];
 const SERIES_GENRES = [
   "bl",
@@ -26,7 +26,6 @@ const LEGACY_GENRE_ALIASES = {
 };
 const STATUS_LABELS = {
   reading: "Reading",
-  paused: "Paused",
   "want-to-read": "Want to read",
   completed: "Completed"
 };
