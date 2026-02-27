@@ -306,6 +306,23 @@ function handleListClick(event) {
     return;
   }
 
+  if (action === "toggle-favorite") {
+    const now = Date.now();
+    state.items = state.items.map((item) => {
+      if (item.id !== id) {
+        return item;
+      }
+      return {
+        ...item,
+        favorite: !normalizeFavorite(item.favorite),
+        _updatedAt: now
+      };
+    });
+    persistItems(state.items);
+    render();
+    return;
+  }
+
   if (action === "cycle-status") {
     openStatusPrompt(id);
   }
@@ -824,9 +841,10 @@ function renderSection(listEl, emptyEl, items, visible) {
     return;
   }
 
+  const sortedItems = sortSectionItems(items);
   const canDrag = items.length > 1;
   listEl.innerHTML = "";
-  items.forEach((item) => {
+  sortedItems.forEach((item) => {
     listEl.append(createSeriesCard(item, canDrag));
   });
 
@@ -838,6 +856,7 @@ function createSeriesCard(item, canDrag) {
   card.dataset.id = item.id;
   card.draggable = canDrag;
   card.classList.toggle("is-draggable", canDrag);
+  card.classList.toggle("is-favorite", normalizeFavorite(item.favorite));
   clearCardAccent(card);
 
   const statusPill = card.querySelector(".series-status");
@@ -865,7 +884,7 @@ function createSeriesCard(item, canDrag) {
   }
 
   const titleLink = card.querySelector(".wish-title-link");
-  titleLink.textContent = item.title;
+  titleLink.textContent = normalizeFavorite(item.favorite) ? `${item.title} ✦` : item.title;
   titleLink.href = item.url;
 
   card.querySelector(".wish-meta-text").textContent = buildMetaLine(item);
@@ -881,6 +900,9 @@ function createSeriesCard(item, canDrag) {
 
   const cycleButton = card.querySelector("[data-action='cycle-status']");
   cycleButton.textContent = getStatusActionLabel(item.status);
+
+  const favoriteButton = card.querySelector("[data-action='toggle-favorite']");
+  favoriteButton.textContent = normalizeFavorite(item.favorite) ? "Unfavorite" : "Favorite";
 
   return card;
 }
@@ -965,6 +987,7 @@ function loadItems() {
         genre: normalizeGenre(item.genre),
         chapter: String(item.chapter || ""),
         status: normalizeStatus(item.status),
+        favorite: normalizeFavorite(item.favorite ?? item.favourite ?? item.pinned),
         note: String(item.note || "")
       }));
   } catch {
@@ -1202,6 +1225,29 @@ function getStatusActionLabel(currentStatus) {
   }
 
   return `Set to ${STATUS_LABELS[targetStatus].toLowerCase()}`;
+}
+
+function sortSectionItems(items) {
+  return [...items].sort((a, b) => {
+    const aFavorite = normalizeFavorite(a.favorite) ? 1 : 0;
+    const bFavorite = normalizeFavorite(b.favorite) ? 1 : 0;
+    if (aFavorite !== bFavorite) {
+      return bFavorite - aFavorite;
+    }
+    return normalizeOrder(a.order, 0) - normalizeOrder(b.order, 0);
+  });
+}
+
+function normalizeFavorite(value) {
+  if (value === true || value === 1 || value === "1") {
+    return true;
+  }
+
+  if (typeof value === "string") {
+    return value.toLowerCase() === "true";
+  }
+
+  return false;
 }
 
 function getCleanValue(value) {
