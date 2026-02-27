@@ -69,11 +69,20 @@
         <template id="wish-template">
           <li class="wish-card">
             <div class="card-top">
+              <a
+                class="chip track-bubble"
+                data-track-bubble
+                href="#"
+                target="_blank"
+                rel="noopener noreferrer"
+                hidden
+              >
+                track
+              </a>
               <details class="card-menu">
                 <summary class="menu-trigger" aria-label="More options">⋯</summary>
                 <div class="menu-panel">
                   <button type="button" data-action="edit-item">Edit</button>
-                  <button type="button" data-action="track-package" hidden>Track package</button>
                   <button type="button" data-action="toggle-on-way">Mark on the way</button>
                   <button type="button" data-action="toggle-owned">Mark bought</button>
                   <button type="button" data-action="delete">Delete</button>

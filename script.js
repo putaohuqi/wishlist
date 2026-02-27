@@ -216,20 +216,6 @@ function handleListClick(event) {
   const action = actionButton.dataset.action;
   closeCardMenu(actionButton);
 
-  if (action === "track-package") {
-    const item = state.items.find((entry) => entry.id === id);
-    if (!item) {
-      return;
-    }
-    const trackingNumber = normalizeTrackingNumber(item.trackingNumber);
-    if (!trackingNumber) {
-      return;
-    }
-    const trackingUrl = buildCanadaPostTrackingUrl(trackingNumber);
-    window.open(trackingUrl, "_blank", "noopener,noreferrer");
-    return;
-  }
-
   if (action === "edit-item") {
     openEditModal(id);
     return;
@@ -576,9 +562,20 @@ function render() {
     const toggleOnWay = card.querySelector("[data-action='toggle-on-way']");
     toggleOnWay.textContent = purchaseStatus === "on-the-way" ? "Mark delivered" : "Mark on the way";
 
-    const trackPackage = card.querySelector("[data-action='track-package']");
     const canTrack = purchaseStatus === "on-the-way" && Boolean(trackingNumber);
-    trackPackage.hidden = !canTrack;
+    const trackingUrl = canTrack ? buildCanadaPostTrackingUrl(trackingNumber) : "";
+
+    const trackBubble = card.querySelector("[data-track-bubble]");
+    if (trackBubble) {
+      trackBubble.hidden = !canTrack;
+      if (canTrack) {
+        trackBubble.href = trackingUrl;
+        trackBubble.title = `Track ${trackingNumber}`;
+      } else {
+        trackBubble.href = "#";
+        trackBubble.removeAttribute("title");
+      }
+    }
 
     refs.list.append(card);
   });
