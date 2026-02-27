@@ -10,6 +10,7 @@
     closeAuth: document.getElementById("close-auth"),
     syncNow: document.getElementById("auth-sync-now"),
     signOut: document.getElementById("auth-signout"),
+    syncFlash: document.getElementById("auth-sync-flash"),
     status: document.getElementById("auth-status"),
     backdrop: document.getElementById("auth-backdrop"),
     title: document.getElementById("auth-title"),
@@ -30,6 +31,7 @@
   let auth = null;
   let db = null;
   let currentUser = null;
+  let flashTimerId = 0;
 
   initialize();
 
@@ -174,14 +176,17 @@
     }
 
     setFeedback("syncing now...", "muted");
+    showSyncFlash("syncing...");
 
     try {
       await requestSync();
       setFeedback("synced now", "success");
       setSignedInUi(currentUser.email || "signed in");
+      showSyncFlash("changes synced ✦");
     } catch (error) {
       console.error("Manual sync failed:", error);
       reportSyncError(error);
+      showSyncFlash("sync failed, try again");
     } finally {
       if (refs.syncNow) {
         refs.syncNow.disabled = false;
@@ -281,6 +286,8 @@
     if (refs.signOut) {
       refs.signOut.hidden = true;
     }
+
+    hideSyncFlash();
   }
 
   function setAuthLoading(loading) {
@@ -315,6 +322,38 @@
     refs.feedback.textContent = message;
     refs.feedback.classList.remove("is-muted", "is-success", "is-error");
     refs.feedback.classList.add(`is-${tone}`);
+  }
+
+  function showSyncFlash(message) {
+    if (!refs.syncFlash) {
+      return;
+    }
+
+    if (flashTimerId) {
+      window.clearTimeout(flashTimerId);
+      flashTimerId = 0;
+    }
+
+    refs.syncFlash.textContent = message;
+    refs.syncFlash.hidden = false;
+
+    flashTimerId = window.setTimeout(() => {
+      hideSyncFlash();
+    }, 2200);
+  }
+
+  function hideSyncFlash() {
+    if (!refs.syncFlash) {
+      return;
+    }
+
+    if (flashTimerId) {
+      window.clearTimeout(flashTimerId);
+      flashTimerId = 0;
+    }
+
+    refs.syncFlash.hidden = true;
+    refs.syncFlash.textContent = "";
   }
 
   function syncBodyModalState() {

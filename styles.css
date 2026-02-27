@@ -135,6 +135,20 @@ body.modal-open {
   white-space: nowrap;
 }
 
+.sync-flash {
+  height: 28px;
+  border: 1px solid var(--chip-active-border);
+  border-radius: 999px;
+  background: var(--chip-active-bg);
+  color: var(--text);
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.74rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .page-nav {
   display: inline-flex;
   gap: 8px;
