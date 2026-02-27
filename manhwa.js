@@ -531,7 +531,7 @@ function openAddModal() {
   resetCoverInputs();
   refs.form.querySelector("#series-type").value = "";
   refs.form.querySelector("#series-genre").value = "";
-  refs.form.querySelector("#status").value = "reading";
+  refs.form.querySelector("#status").value = "";
   refs.modalTitle.textContent = "Add a read";
   refs.saveSeriesButton.textContent = "Save to tracker";
   openModal();
