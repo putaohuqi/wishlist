@@ -255,14 +255,26 @@ function handleSubmit(event) {
   };
 
   if (state.editingId) {
+    const editingItem = state.items.find((item) => item.id === state.editingId);
+    const nextStatus = normalizeStatus(payload.status || editingItem?.status);
+    const chapterChanged = editingItem ? payload.chapter !== (editingItem.chapter || "") : false;
+    const shouldPromoteForChapterUpdate = Boolean(editingItem) && nextStatus === "reading" && chapterChanged;
+    const nextFrontOrder = shouldPromoteForChapterUpdate ? getFrontOrder(state.items) : null;
+
     state.items = state.items.map((item) => {
       if (item.id !== state.editingId) {
         return item;
       }
-      return {
+      const nextItem = {
         ...item,
         ...payload
       };
+
+      if (shouldPromoteForChapterUpdate && nextFrontOrder !== null) {
+        nextItem.order = nextFrontOrder;
+      }
+
+      return nextItem;
     });
   } else {
     const now = Date.now();
@@ -557,18 +569,28 @@ function handleStatusFormSubmit(event) {
   const chapterInput = getCleanValue(refs.statusChapter.value);
   const chapter = chapterInput || item.chapter || "";
   const now = Date.now();
+  const currentStatus = normalizeStatus(item.status);
+  const targetStatus = normalizeStatus(state.pendingStatusTarget);
+  const isReadingChapterUpdate = currentStatus === "reading" && targetStatus === "reading";
+  const nextFrontOrder = isReadingChapterUpdate ? getFrontOrder(state.items) : null;
 
   state.items = state.items.map((entry) => {
     if (entry.id !== state.pendingStatusId) {
       return entry;
     }
 
-    return {
+    const nextEntry = {
       ...entry,
-      status: normalizeStatus(state.pendingStatusTarget),
+      status: targetStatus,
       chapter,
       _updatedAt: now
     };
+
+    if (isReadingChapterUpdate && nextFrontOrder !== null) {
+      nextEntry.order = nextFrontOrder;
+    }
+
+    return nextEntry;
   });
 
   persistItems(state.items);
@@ -670,7 +692,8 @@ function openStatusPrompt(id) {
     return;
   }
 
-  const targetStatus = getQuickStatusTarget(item.status);
+  const currentStatus = normalizeStatus(item.status);
+  const targetStatus = currentStatus === "reading" ? "reading" : getQuickStatusTarget(currentStatus);
   if (!targetStatus) {
     return;
   }
@@ -684,9 +707,12 @@ function openStatusPrompt(id) {
   refs.confirmBackdrop.hidden = true;
   refs.statusBackdrop.hidden = false;
 
-  refs.statusTitle.textContent = getStatusActionLabel(item.status);
-  refs.statusMessage.textContent = "Add your latest chapter before updating status.";
-  refs.statusSave.textContent = getStatusActionLabel(item.status);
+  const isReadingChapterUpdate = currentStatus === "reading";
+  refs.statusTitle.textContent = isReadingChapterUpdate ? "Update chapter" : getStatusActionLabel(currentStatus);
+  refs.statusMessage.textContent = isReadingChapterUpdate
+    ? "Add your latest chapter read."
+    : "Add your latest chapter before updating status.";
+  refs.statusSave.textContent = isReadingChapterUpdate ? "Update chapter" : getStatusActionLabel(currentStatus);
   refs.statusChapter.value = item.chapter || "";
   syncBodyModalState();
   refs.statusChapter.focus();
@@ -899,7 +925,7 @@ function createSeriesCard(item, canDrag) {
   }
 
   const cycleButton = card.querySelector("[data-action='cycle-status']");
-  cycleButton.textContent = getStatusActionLabel(item.status);
+  cycleButton.textContent = getCardMenuActionLabel(item.status);
 
   const favoriteButton = card.querySelector("[data-action='toggle-favorite']");
   favoriteButton.textContent = normalizeFavorite(item.favorite) ? "Unfavorite" : "Favorite";
@@ -1225,6 +1251,13 @@ function getStatusActionLabel(currentStatus) {
   }
 
   return `Set to ${STATUS_LABELS[targetStatus].toLowerCase()}`;
+}
+
+function getCardMenuActionLabel(currentStatus) {
+  if (normalizeStatus(currentStatus) === "reading") {
+    return "Update chapter";
+  }
+  return getStatusActionLabel(currentStatus);
 }
 
 function sortSectionItems(items) {
