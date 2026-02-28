@@ -176,6 +176,10 @@
       return;
     }
 
+    if (refs.syncNow?.dataset.busy === "true") {
+      return;
+    }
+
     setSyncButtonState(SYNC_BUTTON_TEXT.loading, true);
     setFeedback("syncing now...", "muted");
 
@@ -325,12 +329,14 @@
     refs.feedback.classList.add(`is-${tone}`);
   }
 
-  function setSyncButtonState(label, disabled) {
+  function setSyncButtonState(label, busy) {
     if (!refs.syncNow) {
       return;
     }
     refs.syncNow.textContent = label;
-    refs.syncNow.disabled = Boolean(disabled);
+    refs.syncNow.dataset.busy = busy ? "true" : "false";
+    refs.syncNow.classList.toggle("is-busy", Boolean(busy));
+    refs.syncNow.setAttribute("aria-disabled", busy ? "true" : "false");
   }
 
   function clearSyncButtonTimer() {
