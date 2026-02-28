@@ -4,13 +4,18 @@
   const META_SUFFIX = "-meta-v1";
   const BACKUP_SUFFIX = "-backup-v1";
   const REQUIRED_CONFIG_FIELDS = ["apiKey", "authDomain", "projectId", "appId"];
+  const SYNC_BUTTON_TEXT = {
+    idle: "sync",
+    loading: "syncing...",
+    success: "changes synced",
+    error: "sync failed"
+  };
 
   const refs = {
     openAuth: document.getElementById("open-auth"),
     closeAuth: document.getElementById("close-auth"),
     syncNow: document.getElementById("auth-sync-now"),
     signOut: document.getElementById("auth-signout"),
-    syncFlash: document.getElementById("auth-sync-flash"),
     status: document.getElementById("auth-status"),
     backdrop: document.getElementById("auth-backdrop"),
     title: document.getElementById("auth-title"),
@@ -31,7 +36,7 @@
   let auth = null;
   let db = null;
   let currentUser = null;
-  let flashTimerId = 0;
+  let syncButtonTimerId = 0;
 
   initialize();
 
@@ -171,26 +176,20 @@
       return;
     }
 
-    if (refs.syncNow) {
-      refs.syncNow.disabled = true;
-    }
-
+    setSyncButtonState(SYNC_BUTTON_TEXT.loading, true);
     setFeedback("syncing now...", "muted");
-    showSyncFlash("syncing...");
 
     try {
       await requestSync();
       setFeedback("synced now", "success");
       setSignedInUi(currentUser.email || "signed in");
-      showSyncFlash("changes synced ✦");
+      setSyncButtonState(SYNC_BUTTON_TEXT.success, true);
+      scheduleSyncButtonReset();
     } catch (error) {
       console.error("Manual sync failed:", error);
       reportSyncError(error);
-      showSyncFlash("sync failed, try again");
-    } finally {
-      if (refs.syncNow) {
-        refs.syncNow.disabled = false;
-      }
+      setSyncButtonState(SYNC_BUTTON_TEXT.error, true);
+      scheduleSyncButtonReset();
     }
   }
 
@@ -261,6 +260,9 @@
 
     if (refs.syncNow) {
       refs.syncNow.hidden = false;
+      if (refs.syncNow.textContent !== SYNC_BUTTON_TEXT.loading) {
+        resetSyncButton();
+      }
     }
 
     if (refs.signOut) {
@@ -279,15 +281,14 @@
     }
 
     if (refs.syncNow) {
+      resetSyncButton();
       refs.syncNow.hidden = true;
-      refs.syncNow.disabled = false;
     }
 
     if (refs.signOut) {
       refs.signOut.hidden = true;
     }
 
-    hideSyncFlash();
   }
 
   function setAuthLoading(loading) {
@@ -324,36 +325,36 @@
     refs.feedback.classList.add(`is-${tone}`);
   }
 
-  function showSyncFlash(message) {
-    if (!refs.syncFlash) {
+  function setSyncButtonState(label, disabled) {
+    if (!refs.syncNow) {
       return;
     }
-
-    if (flashTimerId) {
-      window.clearTimeout(flashTimerId);
-      flashTimerId = 0;
-    }
-
-    refs.syncFlash.textContent = message;
-    refs.syncFlash.hidden = false;
-
-    flashTimerId = window.setTimeout(() => {
-      hideSyncFlash();
-    }, 2200);
+    refs.syncNow.textContent = label;
+    refs.syncNow.disabled = Boolean(disabled);
   }
 
-  function hideSyncFlash() {
-    if (!refs.syncFlash) {
+  function clearSyncButtonTimer() {
+    if (!syncButtonTimerId) {
       return;
     }
+    window.clearTimeout(syncButtonTimerId);
+    syncButtonTimerId = 0;
+  }
 
-    if (flashTimerId) {
-      window.clearTimeout(flashTimerId);
-      flashTimerId = 0;
-    }
+  function resetSyncButton() {
+    clearSyncButtonTimer();
+    setSyncButtonState(SYNC_BUTTON_TEXT.idle, false);
+  }
 
-    refs.syncFlash.hidden = true;
-    refs.syncFlash.textContent = "";
+  function scheduleSyncButtonReset(delayMs = 2200) {
+    clearSyncButtonTimer();
+    syncButtonTimerId = window.setTimeout(() => {
+      syncButtonTimerId = 0;
+      if (!currentUser || !refs.syncNow || refs.syncNow.hidden) {
+        return;
+      }
+      setSyncButtonState(SYNC_BUTTON_TEXT.idle, false);
+    }, delayMs);
   }
 
   function syncBodyModalState() {
