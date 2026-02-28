@@ -93,6 +93,7 @@ const refs = {
   genreFilters: Array.from(document.querySelectorAll("[data-genre-filter]")),
   stats: document.getElementById("header-stats"),
   openAdd: document.getElementById("open-add"),
+  refreshApp: document.getElementById("refresh-app"),
   closeAdd: document.getElementById("close-add"),
   modalBackdrop: document.getElementById("modal-backdrop"),
   modalTitle: document.getElementById("modal-title"),
@@ -127,6 +128,7 @@ function initialize() {
   refs.typeFilters.forEach((button) => button.addEventListener("click", handleTypeFilterChange));
   refs.genreFilters.forEach((button) => button.addEventListener("click", handleGenreFilterChange));
   refs.openAdd.addEventListener("click", openAddModal);
+  refs.refreshApp?.addEventListener("click", handleManualRefresh);
   refs.closeAdd.addEventListener("click", closeModal);
   refs.modalBackdrop.addEventListener("click", handleModalBackdropClick);
   refs.confirmBackdrop.addEventListener("click", handleConfirmBackdropClick);
@@ -152,6 +154,29 @@ function initialize() {
   setActiveGenreFilterButton();
   resetCoverInputs();
   render();
+}
+
+async function handleManualRefresh() {
+  const refreshButton = refs.refreshApp;
+  if (refreshButton) {
+    refreshButton.disabled = true;
+    refreshButton.textContent = "refreshing...";
+  }
+
+  const cloud = window.WishlistCloud;
+  if (cloud && typeof cloud.getCurrentUser === "function" && cloud.getCurrentUser()) {
+    try {
+      if (typeof cloud.requestSync === "function") {
+        await cloud.requestSync();
+      }
+    } catch (error) {
+      console.error("Refresh sync failed:", error);
+    }
+  }
+
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("refresh", String(Date.now()));
+  window.location.replace(nextUrl.toString());
 }
 
 function initializeCloudSync() {

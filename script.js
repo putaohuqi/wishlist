@@ -31,6 +31,7 @@ const refs = {
   filters: Array.from(document.querySelectorAll("[data-filter]")),
   stats: document.getElementById("header-stats"),
   openAdd: document.getElementById("open-add"),
+  refreshApp: document.getElementById("refresh-app"),
   closeAdd: document.getElementById("close-add"),
   modalBackdrop: document.getElementById("modal-backdrop"),
   modalTitle: document.getElementById("modal-title"),
@@ -53,6 +54,7 @@ function initialize() {
   refs.search.addEventListener("input", handleSearch);
   refs.filters.forEach((button) => button.addEventListener("click", handleFilterChange));
   refs.openAdd.addEventListener("click", openAddModal);
+  refs.refreshApp?.addEventListener("click", handleManualRefresh);
   refs.closeAdd.addEventListener("click", closeModal);
   refs.modalBackdrop.addEventListener("click", handleModalBackdropClick);
   refs.confirmBackdrop.addEventListener("click", handleConfirmBackdropClick);
@@ -75,6 +77,29 @@ function initialize() {
   syncTrackingFieldState();
   applyViewClass();
   render();
+}
+
+async function handleManualRefresh() {
+  const refreshButton = refs.refreshApp;
+  if (refreshButton) {
+    refreshButton.disabled = true;
+    refreshButton.textContent = "refreshing...";
+  }
+
+  const cloud = window.WishlistCloud;
+  if (cloud && typeof cloud.getCurrentUser === "function" && cloud.getCurrentUser()) {
+    try {
+      if (typeof cloud.requestSync === "function") {
+        await cloud.requestSync();
+      }
+    } catch (error) {
+      console.error("Refresh sync failed:", error);
+    }
+  }
+
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("refresh", String(Date.now()));
+  window.location.replace(nextUrl.toString());
 }
 
 function initializeCloudSync() {
