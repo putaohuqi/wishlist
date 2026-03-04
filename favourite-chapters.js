@@ -1,10 +1,51 @@
 const STORAGE_KEY = "favourite-chapters-items-v1";
 const CLOUD_LIST_ID = "favourite-chapters";
 const MAX_UPLOAD_BYTES = 1200 * 1024;
+const SERIES_TYPES = ["manhwa", "manga", "manhua"];
+const SERIES_GENRES = [
+  "bl",
+  "romance-fantasy",
+  "action",
+  "romance",
+  "drama",
+  "comedy",
+  "academy",
+  "idol",
+  "slice-of-life",
+  "horror",
+  "revenge"
+];
+const LEGACY_GENRE_ALIASES = {
+  "isekai-romance": "romance-fantasy",
+  modern: "romance",
+  "action-fantasy": "action",
+  "horror-revenge": "revenge",
+  school: "academy"
+};
+const TYPE_LABELS = {
+  manhwa: "manhwa",
+  manga: "manga",
+  manhua: "manhua"
+};
+const GENRE_LABELS = {
+  bl: "BL",
+  "romance-fantasy": "romance fantasy",
+  action: "action",
+  romance: "romance",
+  drama: "drama",
+  comedy: "comedy",
+  academy: "academy",
+  idol: "idol",
+  "slice-of-life": "slice of life",
+  horror: "horror",
+  revenge: "revenge"
+};
 
 const state = {
   items: loadItems(),
   query: "",
+  typeFilter: "all",
+  genreFilter: "all",
   editingId: null,
   pendingDeleteId: null
 };
@@ -17,6 +58,8 @@ const refs = {
   chapterEmpty: document.getElementById("chapter-empty"),
   chapterCount: document.getElementById("chapter-count"),
   search: document.getElementById("search"),
+  typeFilters: Array.from(document.querySelectorAll("[data-type-filter]")),
+  genreFilters: Array.from(document.querySelectorAll("[data-genre-filter]")),
   stats: document.getElementById("header-stats"),
   openAdd: document.getElementById("open-add"),
   refreshApp: document.getElementById("refresh-app"),
@@ -41,6 +84,8 @@ function initialize() {
   refs.form.addEventListener("submit", handleSubmit);
   refs.list.addEventListener("click", handleListClick);
   refs.search.addEventListener("input", handleSearch);
+  refs.typeFilters.forEach((button) => button.addEventListener("click", handleTypeFilterChange));
+  refs.genreFilters.forEach((button) => button.addEventListener("click", handleGenreFilterChange));
   refs.coverInput.addEventListener("input", handleCoverInputChange);
   refs.coverUploadButton.addEventListener("click", handleCoverUploadClick);
   refs.coverFileInput.addEventListener("change", handleCoverFileChange);
@@ -64,6 +109,8 @@ function initialize() {
 
   initializeCloudSync();
   resetCoverInputs();
+  setActiveTypeFilterButton();
+  setActiveGenreFilterButton();
   render();
 }
 
@@ -156,6 +203,8 @@ function handleSubmit(event) {
   const urlValue = getCleanValue(formData.get("url"));
   const coverValue = getCleanValue(formData.get("cover"));
   const coverDataValue = getCleanValue(formData.get("coverData"));
+  const seriesType = normalizeSeriesType(formData.get("seriesType"));
+  const genre = normalizeGenre(formData.get("genre"));
 
   if (!title || !chapter || !urlValue) {
     return;
@@ -178,6 +227,8 @@ function handleSubmit(event) {
     chapter,
     url: parsedUrl,
     cover: parsedCover,
+    seriesType,
+    genre,
     _updatedAt: Date.now()
   };
 
@@ -233,6 +284,28 @@ function handleListClick(event) {
 
 function handleSearch(event) {
   state.query = getCleanValue(event.target.value).toLowerCase();
+  render();
+}
+
+function handleTypeFilterChange(event) {
+  const nextFilter = event.currentTarget.dataset.typeFilter;
+  if (!nextFilter) {
+    return;
+  }
+
+  state.typeFilter = nextFilter;
+  setActiveTypeFilterButton();
+  render();
+}
+
+function handleGenreFilterChange(event) {
+  const nextFilter = event.currentTarget.dataset.genreFilter;
+  if (!nextFilter) {
+    return;
+  }
+
+  state.genreFilter = nextFilter;
+  setActiveGenreFilterButton();
   render();
 }
 
@@ -338,6 +411,8 @@ function openAddModal() {
   state.editingId = null;
   refs.form.reset();
   resetCoverInputs();
+  refs.form.querySelector("#series-type").value = "";
+  refs.form.querySelector("#series-genre").value = "";
   refs.modalTitle.textContent = "Add a chapter";
   refs.saveChapterButton.textContent = "Save chapter";
   openModal();
@@ -355,6 +430,8 @@ function openEditModal(id) {
   refs.form.querySelector("#chapter").value = item.chapter || "";
   refs.form.querySelector("#url").value = item.url;
   populateCoverInputs(item.cover || "");
+  refs.form.querySelector("#series-type").value = normalizeSeriesType(item.seriesType);
+  refs.form.querySelector("#series-genre").value = normalizeGenre(item.genre);
   refs.modalTitle.textContent = "Edit chapter";
   refs.saveChapterButton.textContent = "Save changes";
   openModal();
@@ -463,9 +540,21 @@ function setCoverUploadStatus(message, stateName) {
   refs.coverUploadStatus.classList.add(`is-${stateName}`);
 }
 
+function setActiveTypeFilterButton() {
+  refs.typeFilters.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.typeFilter === state.typeFilter);
+  });
+}
+
+function setActiveGenreFilterButton() {
+  refs.genreFilters.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.genreFilter === state.genreFilter);
+  });
+}
+
 function render() {
   const activeItems = getActiveItems(state.items);
-  const visibleItems = getVisibleItems(activeItems, state.query);
+  const visibleItems = getVisibleItems(activeItems, state.query, state.typeFilter, state.genreFilter);
 
   refs.stats.textContent = `${activeItems.length} chapters saved`;
   refs.chapterCount.textContent = `${visibleItems.length} chapters`;
@@ -519,9 +608,25 @@ function createChapterCard(item) {
   titleLink.textContent = item.title;
   titleLink.href = item.url;
 
-  card.querySelector(".wish-meta-text").textContent = `Ch. ${item.chapter}`;
+  card.querySelector(".wish-meta-text").textContent = buildMetaLine(item);
 
   return card;
+}
+
+function buildMetaLine(item) {
+  const parts = [`Ch. ${item.chapter}`];
+  const type = normalizeSeriesType(item.seriesType);
+  const genre = normalizeGenre(item.genre);
+
+  if (type && TYPE_LABELS[type]) {
+    parts.push(TYPE_LABELS[type]);
+  }
+
+  if (genre && GENRE_LABELS[genre]) {
+    parts.push(GENRE_LABELS[genre]);
+  }
+
+  return parts.join(" · ");
 }
 
 function getActiveItems(items) {
@@ -530,12 +635,20 @@ function getActiveItems(items) {
     .sort((a, b) => normalizeTimestamp(b._updatedAt || b.createdAt, 0) - normalizeTimestamp(a._updatedAt || a.createdAt, 0));
 }
 
-function getVisibleItems(items, query) {
+function getVisibleItems(items, query, typeFilter, genreFilter) {
   return items.filter((item) => {
+    if (typeFilter !== "all" && normalizeSeriesType(item.seriesType) !== typeFilter) {
+      return false;
+    }
+
+    if (genreFilter !== "all" && normalizeGenre(item.genre) !== genreFilter) {
+      return false;
+    }
+
     if (!query) {
       return true;
     }
-    const haystack = `${item.title} ${item.chapter}`.toLowerCase();
+    const haystack = `${item.title} ${item.chapter} ${item.seriesType} ${item.genre}`.toLowerCase();
     return haystack.includes(query);
   });
 }
@@ -562,6 +675,8 @@ function loadItems() {
         chapter: String(item.chapter || ""),
         url: String(item.url || "#"),
         cover: String(item.cover || ""),
+        seriesType: normalizeSeriesType(item.seriesType),
+        genre: normalizeGenre(item.genre),
         _deleted: normalizeDeleted(item._deleted ?? item.deleted)
       }));
   } catch {
@@ -627,6 +742,23 @@ function normalizeCoverValue(value) {
   }
 
   return normalizeOptionalUrl(clean);
+}
+
+function normalizeSeriesType(value) {
+  const clean = getCleanValue(value).toLowerCase();
+  if (SERIES_TYPES.includes(clean)) {
+    return clean;
+  }
+  return "";
+}
+
+function normalizeGenre(value) {
+  const clean = getCleanValue(value).toLowerCase();
+  const mapped = LEGACY_GENRE_ALIASES[clean] || clean;
+  if (SERIES_GENRES.includes(mapped)) {
+    return mapped;
+  }
+  return "";
 }
 
 function normalizeDeleted(value) {

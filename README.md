@@ -10,7 +10,7 @@ Both pages save locally and can optionally sync with account login.
 ## Features
 - Wishlist add/edit/delete + drag reorder
 - Manhwa tracker with type/genre/status filters + cover upload
-- Faves tracker for title + chapter + link + cover
+- Faves tracker for title + chapter + type + genre + link + cover
 - Local browser save (`localStorage`)
 - Optional email/password login + cloud sync (Firebase Auth + Firestore)
 

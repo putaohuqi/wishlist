@@ -26,7 +26,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" defer></script>
     <script src="firebase-config.js?v=20260303-2" defer></script>
     <script src="auth-sync.js?v=20260303-2" defer></script>
-    <script src="favourite-chapters.js?v=20260304-1" defer></script>
+    <script src="favourite-chapters.js?v=20260304-2" defer></script>
   </head>
   <body>
     <main class="app">
@@ -41,7 +41,7 @@
             <p class="subtitle">my most loved moments ♡</p>
             <h1>faves ✦</h1>
             <p id="header-stats" class="header-stats">0 chapters saved</p>
-            <p class="reorder-hint">title, chapter, cover, and link only</p>
+            <p class="reorder-hint">title, chapter, type, genre, cover, and link</p>
           </div>
           <div class="top-actions">
             <div class="auth-inline">
@@ -58,8 +58,38 @@
         <div class="tool-row">
           <label class="search-wrap" for="search">
             <span class="sr-only">Search faves</span>
-            <input id="search" type="search" placeholder="Search title or chapter" />
+            <input id="search" type="search" placeholder="Search title, chapter, type, or genre" />
           </label>
+        </div>
+
+        <div class="tool-row tool-row-secondary">
+          <div class="taxonomy-group">
+            <p class="taxonomy-label">type</p>
+            <div class="taxonomy-filters" aria-label="Type filters">
+              <button type="button" class="chip is-active" data-type-filter="all">all types</button>
+              <button type="button" class="chip" data-type-filter="manhwa">manhwa</button>
+              <button type="button" class="chip" data-type-filter="manga">manga</button>
+              <button type="button" class="chip" data-type-filter="manhua">manhua</button>
+            </div>
+          </div>
+
+          <div class="taxonomy-group">
+            <p class="taxonomy-label">genre</p>
+            <div class="taxonomy-filters" aria-label="Genre filters">
+              <button type="button" class="chip is-active" data-genre-filter="all">all genres</button>
+              <button type="button" class="chip" data-genre-filter="bl">BL</button>
+              <button type="button" class="chip" data-genre-filter="romance-fantasy">romance fantasy</button>
+              <button type="button" class="chip" data-genre-filter="action">action</button>
+              <button type="button" class="chip" data-genre-filter="romance">romance</button>
+              <button type="button" class="chip" data-genre-filter="drama">drama</button>
+              <button type="button" class="chip" data-genre-filter="comedy">comedy</button>
+              <button type="button" class="chip" data-genre-filter="academy">academy</button>
+              <button type="button" class="chip" data-genre-filter="idol">idol</button>
+              <button type="button" class="chip" data-genre-filter="slice-of-life">slice of life</button>
+              <button type="button" class="chip" data-genre-filter="horror">horror</button>
+              <button type="button" class="chip" data-genre-filter="revenge">revenge</button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -162,6 +192,36 @@
             <button id="cover-upload-btn" type="button" class="chip upload-chip">upload from device</button>
             <button id="cover-upload-clear" type="button" class="chip upload-chip" hidden>clear upload</button>
             <p id="cover-upload-status" class="upload-status">or paste a cover image link above</p>
+          </div>
+
+          <div class="advanced-grid">
+            <div class="field">
+              <label for="series-type">Type</label>
+              <select id="series-type" name="seriesType">
+                <option value="" selected>select</option>
+                <option value="manhwa">manhwa</option>
+                <option value="manga">manga</option>
+                <option value="manhua">manhua</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="series-genre">Genre</label>
+              <select id="series-genre" name="genre">
+                <option value="" selected>select</option>
+                <option value="bl">BL</option>
+                <option value="romance-fantasy">romance fantasy</option>
+                <option value="action">action</option>
+                <option value="romance">romance</option>
+                <option value="drama">drama</option>
+                <option value="comedy">comedy</option>
+                <option value="academy">academy</option>
+                <option value="idol">idol</option>
+                <option value="slice-of-life">slice of life</option>
+                <option value="horror">horror</option>
+                <option value="revenge">revenge</option>
+              </select>
+            </div>
           </div>
 
           <button id="save-chapter-btn" type="submit" class="add-btn">Save chapter</button>
