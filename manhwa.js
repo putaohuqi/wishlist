@@ -1624,6 +1624,8 @@ function extractSourceLabel(urlValue) {
   const knownSources = {
     "asurascans.com": "asurascans",
     "asuratoon.com": "asurascans",
+    "asuracomic.com": "asurascans",
+    "asuracomic.net": "asurascans",
     "mangabuddy.com": "mangabuddy",
     "bato.to": "bato",
     "harimanga.com": "harimanga",
@@ -1646,6 +1648,10 @@ function extractSourceLabel(urlValue) {
     if (host.endsWith(`.${suffix}`)) {
       return knownSources[suffix];
     }
+  }
+
+  if (host.includes("asuracomic")) {
+    return "asurascans";
   }
 
   return deriveDomainLabel(host);
