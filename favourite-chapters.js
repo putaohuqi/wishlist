@@ -47,7 +47,8 @@ const state = {
   typeFilter: "all",
   genreFilter: "all",
   editingId: null,
-  pendingDeleteId: null
+  pendingDeleteId: null,
+  draggingId: null
 };
 
 const refs = {
@@ -83,6 +84,10 @@ initialize();
 function initialize() {
   refs.form.addEventListener("submit", handleSubmit);
   refs.list.addEventListener("click", handleListClick);
+  refs.list.addEventListener("dragstart", handleCardDragStart);
+  refs.list.addEventListener("dragover", handleCardDragOver);
+  refs.list.addEventListener("drop", handleCardDrop);
+  refs.list.addEventListener("dragend", handleCardDragEnd);
   refs.search.addEventListener("input", handleSearch);
   refs.typeFilters.forEach((button) => button.addEventListener("click", handleTypeFilterChange));
   refs.genreFilters.forEach((button) => button.addEventListener("click", handleGenreFilterChange));
@@ -107,6 +112,7 @@ function initialize() {
     persistItems(state.items);
   }
 
+  ensureItemOrder();
   initializeCloudSync();
   resetCoverInputs();
   setActiveTypeFilterButton();
@@ -160,6 +166,7 @@ function initializeCloudSync() {
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(syncedItems));
       state.items = loadItems();
+      ensureItemOrder();
       render();
     } catch (error) {
       console.error("Cloud sync failed for favourite chapters:", error);
@@ -244,10 +251,12 @@ function handleSubmit(event) {
     });
   } else {
     const now = Date.now();
+    const frontOrder = getFrontOrder(state.items);
     state.items.unshift({
       id: createId(),
       createdAt: now,
       _updatedAt: now,
+      order: frontOrder,
       ...payload
     });
   }
@@ -307,6 +316,71 @@ function handleGenreFilterChange(event) {
   state.genreFilter = nextFilter;
   setActiveGenreFilterButton();
   render();
+}
+
+function handleCardDragStart(event) {
+  const card = event.target.closest(".wish-card");
+  if (!card || !card.draggable) {
+    return;
+  }
+
+  state.draggingId = card.dataset.id;
+  card.classList.add("is-dragging");
+
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", state.draggingId);
+  }
+}
+
+function handleCardDragOver(event) {
+  if (!state.draggingId) {
+    return;
+  }
+
+  event.preventDefault();
+  const targetCard = event.target.closest(".wish-card");
+
+  clearDropTargets();
+  if (targetCard && targetCard.dataset.id !== state.draggingId) {
+    targetCard.classList.add("drop-target");
+  }
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "move";
+  }
+}
+
+function handleCardDrop(event) {
+  if (!state.draggingId) {
+    return;
+  }
+
+  event.preventDefault();
+  const sourceId = state.draggingId;
+  const targetCard = event.target.closest(".wish-card");
+  clearDropTargets();
+
+  if (!targetCard) {
+    reorderVisibleItems(sourceId, null, false);
+    cleanupDragState();
+    return;
+  }
+
+  const targetId = targetCard.dataset.id;
+  if (!targetId || targetId === sourceId) {
+    cleanupDragState();
+    return;
+  }
+
+  const rect = targetCard.getBoundingClientRect();
+  const insertAfter = event.clientY > rect.top + rect.height / 2;
+  reorderVisibleItems(sourceId, targetId, insertAfter);
+  cleanupDragState();
+}
+
+function handleCardDragEnd() {
+  cleanupDragState();
 }
 
 function handleCoverInputChange(event) {
@@ -377,6 +451,7 @@ function handleStorageSync(event) {
     return;
   }
   state.items = loadItems();
+  ensureItemOrder();
   render();
 }
 
@@ -555,6 +630,7 @@ function setActiveGenreFilterButton() {
 function render() {
   const activeItems = getActiveItems(state.items);
   const visibleItems = getVisibleItems(activeItems, state.query, state.typeFilter, state.genreFilter);
+  const canDrag = visibleItems.length > 1;
 
   refs.stats.textContent = `${activeItems.length} chapters saved`;
   refs.chapterCount.textContent = `${visibleItems.length} chapters`;
@@ -577,13 +653,15 @@ function render() {
   refs.chapterEmpty.hidden = true;
   refs.list.innerHTML = "";
   visibleItems.forEach((item) => {
-    refs.list.append(createChapterCard(item));
+    refs.list.append(createChapterCard(item, canDrag));
   });
 }
 
-function createChapterCard(item) {
+function createChapterCard(item, canDrag) {
   const card = refs.template.content.firstElementChild.cloneNode(true);
   card.dataset.id = item.id;
+  card.draggable = canDrag;
+  card.classList.toggle("is-draggable", canDrag);
 
   const photoLink = card.querySelector(".wish-photo-link");
   const photo = card.querySelector(".wish-photo");
@@ -630,9 +708,7 @@ function buildMetaLine(item) {
 }
 
 function getActiveItems(items) {
-  return items
-    .filter((item) => !normalizeDeleted(item._deleted))
-    .sort((a, b) => normalizeTimestamp(b._updatedAt || b.createdAt, 0) - normalizeTimestamp(a._updatedAt || a.createdAt, 0));
+  return getOrderedItems(items).filter((item) => !normalizeDeleted(item._deleted));
 }
 
 function getVisibleItems(items, query, typeFilter, genreFilter) {
@@ -667,10 +743,11 @@ function loadItems() {
 
     return parsed
       .filter((item) => item && typeof item === "object")
-      .map((item) => ({
+      .map((item, index) => ({
         id: String(item.id || createId()),
         createdAt: normalizeTimestamp(item.createdAt, Date.now()),
         _updatedAt: normalizeTimestamp(item._updatedAt || item.updatedAt || item.createdAt, Date.now()),
+        order: normalizeOrder(item.order, index),
         title: String(item.title || "Untitled"),
         chapter: String(item.chapter || ""),
         url: String(item.url || "#"),
@@ -700,6 +777,14 @@ function persistItems(items) {
 function normalizeTimestamp(value, fallback) {
   const parsed = Number(value);
   if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return fallback;
+}
+
+function normalizeOrder(value, fallback) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
     return parsed;
   }
   return fallback;
@@ -774,6 +859,96 @@ function getLatestUpdate(items) {
     const nextValue = normalizeTimestamp(item._updatedAt || item.createdAt, 0);
     return nextValue > latest ? nextValue : latest;
   }, 0);
+}
+
+function getOrderedItems(items) {
+  return [...items].sort((a, b) => normalizeOrder(a.order, 0) - normalizeOrder(b.order, 0));
+}
+
+function ensureItemOrder() {
+  const ordered = getOrderedItems(state.items);
+  let changed = false;
+
+  state.items = ordered.map((item, index) => {
+    if (item.order !== index) {
+      changed = true;
+    }
+    return { ...item, order: index };
+  });
+
+  if (changed) {
+    persistItems(state.items);
+  }
+}
+
+function getFrontOrder(items) {
+  if (items.length === 0) {
+    return 0;
+  }
+  let minOrder = normalizeOrder(items[0].order, 0);
+  items.forEach((item) => {
+    const nextOrder = normalizeOrder(item.order, 0);
+    if (nextOrder < minOrder) {
+      minOrder = nextOrder;
+    }
+  });
+  return minOrder - 1;
+}
+
+function reorderVisibleItems(sourceId, targetId, insertAfter) {
+  const visibleIds = getVisibleItems(getActiveItems(state.items), state.query, state.typeFilter, state.genreFilter).map(
+    (item) => item.id
+  );
+  if (!visibleIds.includes(sourceId)) {
+    return;
+  }
+
+  const reorderedVisibleIds = visibleIds.filter((id) => id !== sourceId);
+  if (targetId && reorderedVisibleIds.includes(targetId)) {
+    let targetIndex = reorderedVisibleIds.indexOf(targetId);
+    if (insertAfter) {
+      targetIndex += 1;
+    }
+    reorderedVisibleIds.splice(targetIndex, 0, sourceId);
+  } else {
+    reorderedVisibleIds.push(sourceId);
+  }
+
+  applyVisibleOrderToAllItems(reorderedVisibleIds);
+}
+
+function applyVisibleOrderToAllItems(reorderedVisibleIds) {
+  const ordered = getOrderedItems(state.items);
+  const visibleSet = new Set(reorderedVisibleIds);
+  const pointer = { value: 0 };
+
+  const nextGlobalIds = ordered.map((item) => {
+    if (!visibleSet.has(item.id)) {
+      return item.id;
+    }
+    const nextId = reorderedVisibleIds[pointer.value];
+    pointer.value += 1;
+    return nextId;
+  });
+
+  const itemById = new Map(state.items.map((item) => [item.id, item]));
+  state.items = nextGlobalIds.map((id, index) => {
+    const base = itemById.get(id);
+    return { ...base, order: index };
+  });
+
+  persistItems(state.items);
+  render();
+}
+
+function clearDropTargets() {
+  refs.list.querySelectorAll(".drop-target").forEach((card) => card.classList.remove("drop-target"));
+}
+
+function cleanupDragState() {
+  state.draggingId = null;
+  refs.list.querySelectorAll(".is-dragging").forEach((card) => card.classList.remove("is-dragging"));
+  clearDropTargets();
 }
 
 function getCleanValue(value) {
