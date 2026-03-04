@@ -2,6 +2,7 @@ const STORAGE_KEY = "manhwa-items-v1";
 const CLOUD_LIST_ID = "manhwa";
 const COLOR_SAMPLE_SIZE = 24;
 const MAX_UPLOAD_BYTES = 1200 * 1024;
+const NOTES_EXPORT_FILENAME_PREFIX = "reads-backup";
 const STATUSES = ["reading", "want-to-read", "completed"];
 const SERIES_TYPES = ["manhwa", "manga", "manhua"];
 const SERIES_GENRES = [
@@ -93,6 +94,7 @@ const refs = {
   genreFilters: Array.from(document.querySelectorAll("[data-genre-filter]")),
   stats: document.getElementById("header-stats"),
   openAdd: document.getElementById("open-add"),
+  exportNotes: document.getElementById("export-notes"),
   refreshApp: document.getElementById("refresh-app"),
   closeAdd: document.getElementById("close-add"),
   modalBackdrop: document.getElementById("modal-backdrop"),
@@ -128,6 +130,7 @@ function initialize() {
   refs.typeFilters.forEach((button) => button.addEventListener("click", handleTypeFilterChange));
   refs.genreFilters.forEach((button) => button.addEventListener("click", handleGenreFilterChange));
   refs.openAdd.addEventListener("click", openAddModal);
+  refs.exportNotes?.addEventListener("click", handleExportNotes);
   refs.refreshApp?.addEventListener("click", handleManualRefresh);
   refs.closeAdd.addEventListener("click", closeModal);
   refs.modalBackdrop.addEventListener("click", handleModalBackdropClick);
@@ -568,6 +571,37 @@ function handleModalBackdropClick(event) {
   if (event.target === refs.modalBackdrop) {
     closeModal();
   }
+}
+
+async function handleExportNotes() {
+  const exportButton = refs.exportNotes;
+  if (!exportButton) {
+    return;
+  }
+
+  const exportPayload = buildNotesExportPayload(state.items);
+  const initialLabel = "export to notes";
+  exportButton.disabled = true;
+  exportButton.textContent = "exporting...";
+
+  let copied = false;
+  try {
+    copied = await copyNotesExportToClipboard(exportPayload);
+  } catch (error) {
+    console.error("Could not copy notes export:", error);
+  }
+
+  if (copied) {
+    exportButton.textContent = "copied";
+  } else {
+    downloadNotesExport(exportPayload.plainText);
+    exportButton.textContent = "downloaded txt";
+  }
+
+  window.setTimeout(() => {
+    exportButton.disabled = false;
+    exportButton.textContent = initialLabel;
+  }, 1500);
 }
 
 function handleConfirmBackdropClick(event) {
@@ -1519,4 +1553,167 @@ function readFileAsDataUrl(file) {
     reader.onerror = () => reject(new Error("File read failed"));
     reader.readAsDataURL(file);
   });
+}
+
+function buildNotesExportPayload(items) {
+  const activeItems = getOrderedItems(items).filter((item) => !normalizeDeleted(item._deleted));
+  const ongoingItems = sortSectionItems(
+    activeItems.filter((item) => {
+      const status = normalizeStatus(item.status);
+      return status !== "completed" && status !== "want-to-read";
+    })
+  );
+  const completedItems = sortSectionItems(activeItems.filter((item) => normalizeStatus(item.status) === "completed"));
+
+  const ongoingLines = ongoingItems.map(formatOngoingNotesLine);
+  const completedLines = completedItems.map(formatCompletedNotesLine);
+
+  const plainText = [
+    "ongoing reads:",
+    ...ongoingLines,
+    "",
+    "completed reads:",
+    ...completedLines
+  ].join("\n");
+
+  const ongoingBodyHtml = (ongoingLines.length ? ongoingLines : ["none yet"]).map(escapeHtml).join("<br />");
+  const completedBodyHtml = (completedLines.length ? completedLines : ["none yet"]).map(escapeHtml).join("<br />");
+  const html = `
+    <h2 style="margin:0 0 6px 0;">ongoing reads:</h2>
+    <p style="margin:0;">${ongoingBodyHtml}</p>
+    <br />
+    <h2 style="margin:0 0 6px 0;">completed reads:</h2>
+    <p style="margin:0;">${completedBodyHtml}</p>
+  `;
+
+  return { plainText, html };
+}
+
+function formatOngoingNotesLine(item) {
+  const chapter = getCleanValue(item.chapter);
+  const chapterPart = /^chapter\b/i.test(chapter) ? chapter : chapter ? `chapter ${chapter}` : "chapter ?";
+  const source = extractSourceLabel(item.url);
+  return `${item.title} (${chapterPart}; ${source})`;
+}
+
+function formatCompletedNotesLine(item) {
+  const chapter = getCleanValue(item.chapter);
+  const chapterPart = /^\d+(\.\d+)?$/u.test(chapter)
+    ? `${chapter} chapters`
+    : chapter
+      ? chapter
+      : "chapters unknown";
+  const source = extractSourceLabel(item.url);
+  return `${item.title} (${source}; ${chapterPart})`;
+}
+
+function extractSourceLabel(urlValue) {
+  const cleanUrl = getCleanValue(urlValue);
+  if (!cleanUrl) {
+    return "source unknown";
+  }
+
+  let hostname = "";
+  try {
+    hostname = new URL(cleanUrl).hostname.toLowerCase();
+  } catch {
+    return "source unknown";
+  }
+
+  const host = hostname.replace(/^www\./, "").replace(/^m\./, "");
+  const knownSources = {
+    "asurascans.com": "asurascans",
+    "asuratoon.com": "asurascans",
+    "mangabuddy.com": "mangabuddy",
+    "bato.to": "bato",
+    "harimanga.com": "harimanga",
+    "mangadex.org": "mangadex",
+    "webtoons.com": "webtoon",
+    "mangaowl.io": "mangaowl",
+    "manhuahot.com": "manhuahot",
+    "zinmanga.com": "zinmanga",
+    "kunmanga.com": "kunmanga",
+    "vortexscans.org": "vortexscans"
+  };
+
+  const exact = knownSources[host];
+  if (exact) {
+    return exact;
+  }
+
+  const sourceSuffixes = Object.keys(knownSources);
+  for (const suffix of sourceSuffixes) {
+    if (host.endsWith(`.${suffix}`)) {
+      return knownSources[suffix];
+    }
+  }
+
+  return deriveDomainLabel(host);
+}
+
+function deriveDomainLabel(host) {
+  const segments = host.split(".").filter(Boolean);
+  if (segments.length === 0) {
+    return "source unknown";
+  }
+  if (segments.length === 1) {
+    return segments[0];
+  }
+
+  let index = segments.length - 2;
+  if (segments.length >= 3 && segments[segments.length - 1].length === 2 && segments[segments.length - 2].length <= 3) {
+    index = segments.length - 3;
+  }
+
+  const core = segments[index] || segments[segments.length - 2];
+  const cleanCore = core.replace(/[^a-z0-9-]/gi, "");
+  return cleanCore || "source unknown";
+}
+
+async function copyNotesExportToClipboard(payload) {
+  if (!navigator.clipboard) {
+    return false;
+  }
+
+  if (window.ClipboardItem && payload.html) {
+    try {
+      const clipboardItem = new ClipboardItem({
+        "text/plain": new Blob([payload.plainText], { type: "text/plain" }),
+        "text/html": new Blob([payload.html], { type: "text/html" })
+      });
+      await navigator.clipboard.write([clipboardItem]);
+      return true;
+    } catch (error) {
+      console.error("Rich clipboard write failed, falling back to plain text:", error);
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(payload.plainText);
+    return true;
+  } catch (error) {
+    console.error("Plain clipboard write failed:", error);
+    return false;
+  }
+}
+
+function downloadNotesExport(text) {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const anchor = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 10);
+  anchor.href = URL.createObjectURL(blob);
+  anchor.download = `${NOTES_EXPORT_FILENAME_PREFIX}-${stamp}.txt`;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(anchor.href), 0);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
