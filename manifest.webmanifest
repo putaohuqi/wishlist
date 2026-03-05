@@ -1,8 +1,8 @@
 {
-  "name": "Wishlist",
-  "short_name": "Wishlist",
-  "start_url": "/wishlist/manhwa.html",
-  "scope": "/wishlist/",
+  "name": "Reads",
+  "short_name": "Reads",
+  "start_url": "/reads/manhwa.html",
+  "scope": "/reads/",
   "display": "standalone",
   "background_color": "#fafafb",
   "theme_color": "#9abddc",
